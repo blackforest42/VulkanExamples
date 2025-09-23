@@ -1,4 +1,3 @@
 Sept 22.
-	- Figure out cubemapping in Vulkan
 	- Creating shaders
 	- binding uniforms

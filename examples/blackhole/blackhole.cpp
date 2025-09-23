@@ -81,18 +81,6 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
-  void createTextureImage() {
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(
-        (getAssetPath() + "textures/blackhole/blackhole_color_map.png").c_str(),
-        &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-
-    if (!pixels) {
-      throw std::runtime_error("failed to load texture image!");
-    }
-  }
-
   // Loads a cubemap from a file, uploads it to the device and create all Vulkan
   // resources required to display it
   void loadCubemap(std::string filename, VkFormat format) {
@@ -299,10 +287,8 @@ class VulkanExample : public VulkanExampleBase {
                                      vulkanDevice, queue, glTFLoadingFlags);
     }
     // Cubemap texture
-    loadCubemap(getAssetPath() + "textures/cubemap_yokohama_rgba.ktx",
+    loadCubemap(getAssetPath() + "textures/blackhole/skybox/cubemap.ktx",
                 VK_FORMAT_R8G8B8A8_UNORM);
-
-    createTextureImage();
   }
 
   void setupDescriptors() {
