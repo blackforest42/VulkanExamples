@@ -11,11 +11,12 @@
  * (http://opensource.org/licenses/MIT)
  */
 
+#include "vulkanexamplebase.h"
+
 #include <ktx.h>
 #include <ktxvulkan.h>
 #include "VulkanglTFModel.h"
 #include "stb_image.h"
-#include "vulkanexamplebase.h"
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -50,7 +51,7 @@ class VulkanExample : public VulkanExampleBase {
   std::vector<std::string> objectNames_;
 
   VulkanExample() : VulkanExampleBase() {
-    title = "Cube map textures";
+    title = "Blackhole";
     camera.type = Camera::CameraType::lookat;
     camera.setPosition(glm::vec3(0.0f, 0.0f, -4.0f));
     camera.setRotation(glm::vec3(0.0f));
@@ -58,7 +59,7 @@ class VulkanExample : public VulkanExampleBase {
     camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
   }
 
-  // Called once before renderLoop()
+  // (A) Called once in main() before renderLoop()
   void prepare() {
     VulkanExampleBase::prepare();
     loadAssets();
@@ -68,6 +69,7 @@ class VulkanExample : public VulkanExampleBase {
     prepared = true;
   }
 
+  // (A.1)
   void loadAssets() {
     uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices |
                                 vkglTF::FileLoadingFlags::FlipY;
@@ -88,6 +90,7 @@ class VulkanExample : public VulkanExampleBase {
                 VK_FORMAT_R8G8B8A8_UNORM);
   }
 
+  // (A.2)
   // Prepare and initialize uniform buffer containing shader uniforms
   void prepareUniformBuffers() {
     for (auto& buffer : uniformBuffers_) {
@@ -100,6 +103,7 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
+  // (A.3)
   void setupDescriptors() {
     // Pool
     std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -156,6 +160,7 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
+  // (A.4)
   void preparePipelines() {
     // Layout
     const VkPipelineLayoutCreateInfo pipelineLayoutCI =
@@ -228,6 +233,7 @@ class VulkanExample : public VulkanExampleBase {
         device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.reflect));
   }
 
+  // (B) Called in VulkanExampleBase::renderLoop()
   virtual void render() {
     if (!prepared)
       return;
@@ -237,6 +243,7 @@ class VulkanExample : public VulkanExampleBase {
     VulkanExampleBase::submitFrame();
   }
 
+  // (B.1)
   void updateUniformBuffers() {
     uniformData_.projection = camera.matrices.perspective;
     // Note: Both the object and skybox use the same uniform data, the
@@ -247,6 +254,7 @@ class VulkanExample : public VulkanExampleBase {
            sizeof(uniformData_));
   }
 
+  // (B.2)
   void buildCommandBuffer() {
     VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer];
 
