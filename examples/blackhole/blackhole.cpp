@@ -21,7 +21,7 @@ class VulkanExample : public VulkanExampleBase {
  public:
   bool displaySkybox_ = true;
 
-  vks::Texture cubeMap_;
+  vks::Texture cubeMap_{};
 
   struct Models {
     vkglTF::Model skybox;
@@ -205,22 +205,20 @@ class VulkanExample : public VulkanExampleBase {
         {vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal});
 
     // Skybox pipeline (background cube)
-    shaderStages[0] =
-        loadShader(getShadersPath() + "texturecubemap/skybox.vert.spv",
-                   VK_SHADER_STAGE_VERTEX_BIT);
-    shaderStages[1] =
-        loadShader(getShadersPath() + "texturecubemap/skybox.frag.spv",
-                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/skybox.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] = loadShader(getShadersPath() + "blackhole/skybox.frag.spv",
+                                 VK_SHADER_STAGE_FRAGMENT_BIT);
     rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skybox));
 
     // Cube map reflect pipeline
     shaderStages[0] =
-        loadShader(getShadersPath() + "texturecubemap/reflect.vert.spv",
+        loadShader(getShadersPath() + "blackhole/reflect.vert.spv",
                    VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
-        loadShader(getShadersPath() + "texturecubemap/reflect.frag.spv",
+        loadShader(getShadersPath() + "blackhole/reflect.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
     // Enable depth test and write
     depthStencilState.depthWriteEnable = VK_TRUE;
