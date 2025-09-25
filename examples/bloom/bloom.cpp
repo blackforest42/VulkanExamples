@@ -17,7 +17,7 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  bool bloom_ = true;
+  bool bloom_ = false;
 
   vks::TextureCubeMap cubemap_;
 
