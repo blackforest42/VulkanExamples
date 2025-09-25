@@ -59,7 +59,7 @@ class VulkanExample : public VulkanExampleBase {
     camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
   }
 
-  // (A) Called once in main() before renderLoop()
+  // (Part A.0) Called once in main() before renderLoop()
   void prepare() {
     VulkanExampleBase::prepare();
     loadAssets();

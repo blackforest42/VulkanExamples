@@ -32,12 +32,10 @@ class VulkanExample : public VulkanExampleBase {
     glm::mat4 view;
     glm::mat4 model;
   };
-
   struct UBOBlurParams {
     float blurScale = 1.0f;
     float blurStrength = 1.5f;
   };
-
   struct {
     UBO scene, skyBox;
     UBOBlurParams blurParams;
@@ -103,113 +101,64 @@ class VulkanExample : public VulkanExampleBase {
     camera_.setPerspective(45.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
   }
 
-  // Setup the offscreen framebuffer for rendering the mirrored scene
-  // The color attachment of this framebuffer will then be sampled from
-  void prepareOffscreenFramebuffer(FrameBuffer* frameBuf,
-                                   VkFormat colorFormat,
-                                   VkFormat depthFormat) {
-    // Color attachment
-    VkImageCreateInfo image = vks::initializers::imageCreateInfo();
-    image.imageType = VK_IMAGE_TYPE_2D;
-    image.format = colorFormat;
-    image.extent.width = FB_DIM;
-    image.extent.height = FB_DIM;
-    image.extent.depth = 1;
-    image.mipLevels = 1;
-    image.arrayLayers = 1;
-    image.samples = VK_SAMPLE_COUNT_1_BIT;
-    image.tiling = VK_IMAGE_TILING_OPTIMAL;
-    // We will sample directly from the color attachment
-    image.usage =
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
-    VkMemoryRequirements memReqs;
-
-    VkImageViewCreateInfo colorImageView =
-        vks::initializers::imageViewCreateInfo();
-    colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    colorImageView.format = colorFormat;
-    colorImageView.flags = 0;
-    colorImageView.subresourceRange = {};
-    colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    colorImageView.subresourceRange.baseMipLevel = 0;
-    colorImageView.subresourceRange.levelCount = 1;
-    colorImageView.subresourceRange.baseArrayLayer = 0;
-    colorImageView.subresourceRange.layerCount = 1;
-
-    VK_CHECK_RESULT(
-        vkCreateImage(device_, &image, nullptr, &frameBuf->color.image));
-    vkGetImageMemoryRequirements(device_, frameBuf->color.image, &memReqs);
-    memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
-        memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VK_CHECK_RESULT(
-        vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->color.mem));
-    VK_CHECK_RESULT(vkBindImageMemory(device_, frameBuf->color.image,
-                                      frameBuf->color.mem, 0));
-
-    colorImageView.image = frameBuf->color.image;
-    VK_CHECK_RESULT(vkCreateImageView(device_, &colorImageView, nullptr,
-                                      &frameBuf->color.view));
-
-    // Depth stencil attachment
-    image.format = depthFormat;
-    image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    VkImageViewCreateInfo depthStencilView =
-        vks::initializers::imageViewCreateInfo();
-    depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    depthStencilView.format = depthFormat;
-    depthStencilView.flags = 0;
-    depthStencilView.subresourceRange = {};
-    depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (vks::tools::formatHasStencil(depthFormat)) {
-      depthStencilView.subresourceRange.aspectMask |=
-          VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    depthStencilView.subresourceRange.baseMipLevel = 0;
-    depthStencilView.subresourceRange.levelCount = 1;
-    depthStencilView.subresourceRange.baseArrayLayer = 0;
-    depthStencilView.subresourceRange.layerCount = 1;
-
-    VK_CHECK_RESULT(
-        vkCreateImage(device_, &image, nullptr, &frameBuf->depth.image));
-    vkGetImageMemoryRequirements(device_, frameBuf->depth.image, &memReqs);
-    memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
-        memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VK_CHECK_RESULT(
-        vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->depth.mem));
-    VK_CHECK_RESULT(vkBindImageMemory(device_, frameBuf->depth.image,
-                                      frameBuf->depth.mem, 0));
-
-    depthStencilView.image = frameBuf->depth.image;
-    VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilView, nullptr,
-                                      &frameBuf->depth.view));
-
-    VkImageView attachments[2]{frameBuf->color.view, frameBuf->depth.view};
-
-    VkFramebufferCreateInfo fbufCreateInfo =
-        vks::initializers::framebufferCreateInfo();
-    fbufCreateInfo.renderPass = offscreenPass_.renderPass;
-    fbufCreateInfo.attachmentCount = 2;
-    fbufCreateInfo.pAttachments = attachments;
-    fbufCreateInfo.width = FB_DIM;
-    fbufCreateInfo.height = FB_DIM;
-    fbufCreateInfo.layers = 1;
-
-    VK_CHECK_RESULT(vkCreateFramebuffer(device_, &fbufCreateInfo, nullptr,
-                                        &frameBuf->framebuffer));
-
-    // Fill a descriptor for later use in a descriptor set
-    frameBuf->descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    frameBuf->descriptor.imageView = frameBuf->color.view;
-    frameBuf->descriptor.sampler = offscreenPass_.sampler;
+  // (Part A)
+  void prepare() {
+    VulkanExampleBase::prepare();
+    loadAssets();
+    prepareUniformBuffers();
+    prepareOffscreen();
+    setupDescriptors();
+    preparePipelines();
+    prepared_ = true;
   }
 
-  // Prepare the offscreen framebuffers used for the vertical- and horizontal
-  // blur
+  // (A.1)
+  void loadAssets() {
+    const uint32_t glTFLoadingFlags =
+        vkglTF::FileLoadingFlags::PreTransformVertices |
+        vkglTF::FileLoadingFlags::PreMultiplyVertexColors |
+        vkglTF::FileLoadingFlags::FlipY;
+    models_.ufo.loadFromFile(getAssetPath() + "models/retroufo.gltf",
+                             vulkanDevice, queue_, glTFLoadingFlags);
+    models_.ufoGlow.loadFromFile(getAssetPath() + "models/retroufo_glow.gltf",
+                                 vulkanDevice, queue_, glTFLoadingFlags);
+    models_.skyBox.loadFromFile(getAssetPath() + "models/cube.gltf",
+                                vulkanDevice, queue_, glTFLoadingFlags);
+    cubemap_.loadFromFile(getAssetPath() + "textures/cubemap_space.ktx",
+                          VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+  }
+
+  // (A.2) Prepare and initialize uniform buffer containing shader uniforms
+  void prepareUniformBuffers() {
+    for (auto& buffer : uniformBuffers_) {
+      // Phong and color pass vertex shader uniform buffer
+      VK_CHECK_RESULT(
+          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     &buffer.scene, sizeof(ubos_.scene)));
+      VK_CHECK_RESULT(buffer.scene.map());
+
+      // Blur parameters uniform buffers
+      VK_CHECK_RESULT(vulkanDevice->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.blurParams, sizeof(ubos_.blurParams)));
+      VK_CHECK_RESULT(buffer.blurParams.map());
+
+      // Skybox
+      VK_CHECK_RESULT(
+          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     &buffer.skyBox, sizeof(ubos_.skyBox)));
+      VK_CHECK_RESULT(buffer.skyBox.map());
+    }
+  }
+
+  // (A.3) Prepare the offscreen framebuffers used for the vertical- and
+  // horizontal blur
   void prepareOffscreen() {
     offscreenPass_.width = FB_DIM;
     offscreenPass_.height = FB_DIM;
@@ -327,21 +276,112 @@ class VulkanExample : public VulkanExampleBase {
                                 FB_COLOR_FORMAT, fbDepthFormat);
   }
 
-  void loadAssets() {
-    const uint32_t glTFLoadingFlags =
-        vkglTF::FileLoadingFlags::PreTransformVertices |
-        vkglTF::FileLoadingFlags::PreMultiplyVertexColors |
-        vkglTF::FileLoadingFlags::FlipY;
-    models_.ufo.loadFromFile(getAssetPath() + "models/retroufo.gltf",
-                             vulkanDevice, queue_, glTFLoadingFlags);
-    models_.ufoGlow.loadFromFile(getAssetPath() + "models/retroufo_glow.gltf",
-                                 vulkanDevice, queue_, glTFLoadingFlags);
-    models_.skyBox.loadFromFile(getAssetPath() + "models/cube.gltf",
-                                vulkanDevice, queue_, glTFLoadingFlags);
-    cubemap_.loadFromFile(getAssetPath() + "textures/cubemap_space.ktx",
-                          VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+  // (A.4) Setup the offscreen framebuffer for rendering the mirrored scene
+  // The color attachment of this framebuffer will then be sampled from
+  void prepareOffscreenFramebuffer(FrameBuffer* frameBuf,
+                                   VkFormat colorFormat,
+                                   VkFormat depthFormat) {
+    // Color attachment
+    VkImageCreateInfo image = vks::initializers::imageCreateInfo();
+    image.imageType = VK_IMAGE_TYPE_2D;
+    image.format = colorFormat;
+    image.extent.width = FB_DIM;
+    image.extent.height = FB_DIM;
+    image.extent.depth = 1;
+    image.mipLevels = 1;
+    image.arrayLayers = 1;
+    image.samples = VK_SAMPLE_COUNT_1_BIT;
+    image.tiling = VK_IMAGE_TILING_OPTIMAL;
+    // We will sample directly from the color attachment
+    image.usage =
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
+    VkMemoryRequirements memReqs;
+
+    VkImageViewCreateInfo colorImageView =
+        vks::initializers::imageViewCreateInfo();
+    colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    colorImageView.format = colorFormat;
+    colorImageView.flags = 0;
+    colorImageView.subresourceRange = {};
+    colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorImageView.subresourceRange.baseMipLevel = 0;
+    colorImageView.subresourceRange.levelCount = 1;
+    colorImageView.subresourceRange.baseArrayLayer = 0;
+    colorImageView.subresourceRange.layerCount = 1;
+
+    VK_CHECK_RESULT(
+        vkCreateImage(device_, &image, nullptr, &frameBuf->color.image));
+    vkGetImageMemoryRequirements(device_, frameBuf->color.image, &memReqs);
+    memAlloc.allocationSize = memReqs.size;
+    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
+        memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CHECK_RESULT(
+        vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->color.mem));
+    VK_CHECK_RESULT(vkBindImageMemory(device_, frameBuf->color.image,
+                                      frameBuf->color.mem, 0));
+
+    colorImageView.image = frameBuf->color.image;
+    VK_CHECK_RESULT(vkCreateImageView(device_, &colorImageView, nullptr,
+                                      &frameBuf->color.view));
+
+    // Depth stencil attachment
+    image.format = depthFormat;
+    image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    VkImageViewCreateInfo depthStencilView =
+        vks::initializers::imageViewCreateInfo();
+    depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    depthStencilView.format = depthFormat;
+    depthStencilView.flags = 0;
+    depthStencilView.subresourceRange = {};
+    depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (vks::tools::formatHasStencil(depthFormat)) {
+      depthStencilView.subresourceRange.aspectMask |=
+          VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    depthStencilView.subresourceRange.baseMipLevel = 0;
+    depthStencilView.subresourceRange.levelCount = 1;
+    depthStencilView.subresourceRange.baseArrayLayer = 0;
+    depthStencilView.subresourceRange.layerCount = 1;
+
+    VK_CHECK_RESULT(
+        vkCreateImage(device_, &image, nullptr, &frameBuf->depth.image));
+    vkGetImageMemoryRequirements(device_, frameBuf->depth.image, &memReqs);
+    memAlloc.allocationSize = memReqs.size;
+    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
+        memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CHECK_RESULT(
+        vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->depth.mem));
+    VK_CHECK_RESULT(vkBindImageMemory(device_, frameBuf->depth.image,
+                                      frameBuf->depth.mem, 0));
+
+    depthStencilView.image = frameBuf->depth.image;
+    VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilView, nullptr,
+                                      &frameBuf->depth.view));
+
+    VkImageView attachments[2]{frameBuf->color.view, frameBuf->depth.view};
+
+    VkFramebufferCreateInfo fbufCreateInfo =
+        vks::initializers::framebufferCreateInfo();
+    fbufCreateInfo.renderPass = offscreenPass_.renderPass;
+    fbufCreateInfo.attachmentCount = 2;
+    fbufCreateInfo.pAttachments = attachments;
+    fbufCreateInfo.width = FB_DIM;
+    fbufCreateInfo.height = FB_DIM;
+    fbufCreateInfo.layers = 1;
+
+    VK_CHECK_RESULT(vkCreateFramebuffer(device_, &fbufCreateInfo, nullptr,
+                                        &frameBuf->framebuffer));
+
+    // Fill a descriptor for later use in a descriptor set
+    frameBuf->descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    frameBuf->descriptor.imageView = frameBuf->color.view;
+    frameBuf->descriptor.sampler = offscreenPass_.sampler;
   }
 
+  // (A.5)
   void setupDescriptors() {
     // Pool
     std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -469,6 +509,7 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
+  // (A.6)
   void preparePipelines() {
     // Layouts
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo =
@@ -599,33 +640,17 @@ class VulkanExample : public VulkanExampleBase {
         device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skyBox));
   }
 
-  // Prepare and initialize uniform buffer containing shader uniforms
-  void prepareUniformBuffers() {
-    for (auto& buffer : uniformBuffers_) {
-      // Phong and color pass vertex shader uniform buffer
-      VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     &buffer.scene, sizeof(ubos_.scene)));
-      VK_CHECK_RESULT(buffer.scene.map());
-      // Blur parameters uniform buffers
-      VK_CHECK_RESULT(vulkanDevice->createBuffer(
-          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-          &buffer.blurParams, sizeof(ubos_.blurParams)));
-      VK_CHECK_RESULT(buffer.blurParams.map());
-      // Skybox
-      VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     &buffer.skyBox, sizeof(ubos_.skyBox)));
-      VK_CHECK_RESULT(buffer.skyBox.map());
-    }
+  // (Part B) Called in VulkanExampleBase::renderLoop()
+  virtual void render() {
+    if (!prepared_)
+      return;
+    VulkanExampleBase::prepareFrame();
+    updateUniformBuffers();
+    buildCommandBuffer();
+    VulkanExampleBase::submitFrame();
   }
 
+  // (B.1)
   void updateUniformBuffers() {
     // UFO
     ubos_.scene.projection = camera_.matrices.perspective;
@@ -656,16 +681,7 @@ class VulkanExample : public VulkanExampleBase {
            sizeof(ubos_.blurParams));
   }
 
-  void prepare() {
-    VulkanExampleBase::prepare();
-    loadAssets();
-    prepareUniformBuffers();
-    prepareOffscreen();
-    setupDescriptors();
-    preparePipelines();
-    prepared_ = true;
-  }
-
+  // (B.2)
   void buildCommandBuffer() {
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();
@@ -811,15 +827,6 @@ class VulkanExample : public VulkanExampleBase {
     }
 
     VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
-  }
-
-  virtual void render() {
-    if (!prepared_)
-      return;
-    VulkanExampleBase::prepareFrame();
-    updateUniformBuffers();
-    buildCommandBuffer();
-    VulkanExampleBase::submitFrame();
   }
 
   virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay) {
