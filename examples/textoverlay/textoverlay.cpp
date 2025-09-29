@@ -395,7 +395,7 @@ public:
 		camera_.setPosition(glm::vec3(0.0f, 0.0f, -2.5f));
 		camera_.setRotation(glm::vec3(-25.0f, -0.0f, 0.0f));
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
-		settings.overlay = false;
+		settings_.overlay = false;
 	}
 
 	~VulkanExample()
@@ -414,7 +414,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/torusknot.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		model.loadFromFile(getAssetPath() + "models/torusknot.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -478,7 +478,7 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "textoverlay/mesh.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "textoverlay/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -486,7 +486,7 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Scene matrices uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -509,21 +509,21 @@ public:
 		// textOverlay->addText writes to the vertex buffer for the current frame
 		//VK_CHECK_RESULT(vkMapMemory(vulkanDevice->logicalDevice, textOverlay->vertexBuffers[currentBuffer].memory, 0, VK_WHOLE_SIZE, 0, (void**)&textOverlay->mapped));
 
-		textOverlay->addText(title, 5.0f * ui.scale, 5.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText(title, 5.0f * ui_.scale, 5.0f * ui_.scale, TextOverlay::alignLeft);
 
 		std::stringstream ss;
 		ss << std::fixed << std::setprecision(2) << (frameTimer * 1000.0f) << "ms (" << lastFPS << " fps)";
-		textOverlay->addText(ss.str(), 5.0f * ui.scale, 25.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText(ss.str(), 5.0f * ui_.scale, 25.0f * ui_.scale, TextOverlay::alignLeft);
 
-		textOverlay->addText(deviceProperties.deviceName, 5.0f * ui.scale, 45.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText(deviceProperties_.deviceName, 5.0f * ui_.scale, 45.0f * ui_.scale, TextOverlay::alignLeft);
 
 		// Display current model view matrix
-		textOverlay->addText("model view matrix", (float)width_ - 5.0f * ui.scale, 5.0f * ui.scale, TextOverlay::alignRight);
+		textOverlay->addText("model view matrix", (float)width_ - 5.0f * ui_.scale, 5.0f * ui_.scale, TextOverlay::alignRight);
 		for (uint32_t i = 0; i < 4; i++) {
 			ss.str("");
 			ss << std::fixed << std::setprecision(2) << std::showpos;
 			ss << uniformData.modelView[0][i] << " " << uniformData.modelView[1][i] << " " << uniformData.modelView[2][i] << " " << uniformData.modelView[3][i];
-			textOverlay->addText(ss.str(), (float)width_ - 5.0f * ui.scale, (25.0f + (float)i * 20.0f) * ui.scale, TextOverlay::alignRight);
+			textOverlay->addText(ss.str(), (float)width_ - 5.0f * ui_.scale, (25.0f + (float)i * 20.0f) * ui_.scale, TextOverlay::alignRight);
 		}
 
 		glm::vec3 projected = glm::project(glm::vec3(0.0f), uniformData.modelView, uniformData.projection, glm::vec4(0, 0, (float)width_, (float)height_));
@@ -531,8 +531,8 @@ public:
 
 #if defined(__ANDROID__)
 #else
-		textOverlay->addText("Press \"space\" to toggle text overlay", 5.0f * ui.scale, 65.0f * ui.scale, TextOverlay::alignLeft);
-		textOverlay->addText("Hold middle mouse button and drag to move", 5.0f * ui.scale, 85.0f * ui.scale, TextOverlay::alignLeft);
+		textOverlay->addText("Press \"space\" to toggle text overlay", 5.0f * ui_.scale, 65.0f * ui_.scale, TextOverlay::alignLeft);
+		textOverlay->addText("Hold middle mouse button and drag to move", 5.0f * ui_.scale, 85.0f * ui_.scale, TextOverlay::alignLeft);
 #endif
 
 		//vkUnmapMemory(vulkanDevice->logicalDevice, textOverlay->vertexBuffers[currentBuffer].memory);
@@ -545,12 +545,12 @@ public:
 		shaderStages.push_back(loadShader(getShadersPath() + "textoverlay/text.vert.spv", VK_SHADER_STAGE_VERTEX_BIT));
 		shaderStages.push_back(loadShader(getShadersPath() + "textoverlay/text.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT));
 		textOverlay = new TextOverlay(
-			vulkanDevice,
+			vulkanDevice_,
 			queue_,
 			renderPass_,
 			&width_,
 			&height_,
-			ui.scale,
+			ui_.scale,
 			shaderStages
 		);
 	}
@@ -568,7 +568,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

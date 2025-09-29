@@ -74,27 +74,27 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Example requires tessellation shaders
-		if (deviceFeatures.tessellationShader) {
-			enabledFeatures.tessellationShader = VK_TRUE;
+		if (deviceFeatures_.tessellationShader) {
+			enabledFeatures_.tessellationShader = VK_TRUE;
 		}
 		else {
 			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		}
 		else {
 			wireframe = false;
 		}
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	}
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/deer.gltf", vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+		model.loadFromFile(getAssetPath() + "models/deer.gltf", vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void setupDescriptors()
@@ -170,11 +170,11 @@ public:
 
 		// Tessellation pipelines
 		// Solid
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.solid));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.solid));
 		// Wireframe
-		if (deviceFeatures.fillModeNonSolid) {
+		if (deviceFeatures_.fillModeNonSolid) {
 			rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wire));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wire));
 		}
 
 		// Pass through pipelines
@@ -184,11 +184,11 @@ public:
 
 		// Solid
 		rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.solidPassThrough));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.solidPassThrough));
 		// Wireframe
-		if (deviceFeatures.fillModeNonSolid) {
+		if (deviceFeatures_.fillModeNonSolid) {
 			rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wirePassThrough));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wirePassThrough));
 		}
 	}
 
@@ -196,7 +196,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -222,7 +222,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -286,7 +286,7 @@ public:
 	{
 		if (overlay->header("Settings")) {
 			overlay->inputFloat("Tessellation level", &uniformData.tessLevel, 0.25f, 2);
-			if (deviceFeatures.fillModeNonSolid) {
+			if (deviceFeatures_.fillModeNonSolid) {
 				overlay->checkBox("Wireframe", &wireframe);
 				if (overlay->checkBox("Splitscreen", &splitScreen)) {
 					camera_.setPerspective(45.0f, (float)(width_ * ((splitScreen) ? 0.5f : 1.0f)) / (float)height_, 0.1f, 256.0f);

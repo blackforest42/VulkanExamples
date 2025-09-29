@@ -107,8 +107,8 @@ public:
 
 	void loadAssets()
 	{
-		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	// Setup and fill the compute shader storage buffers containing the particles
@@ -129,18 +129,18 @@ public:
 
 		// Copy initial particle data to a staging buffer
 		vks::Buffer stagingBuffer;
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, particleBuffer.data());
+		vulkanDevice_->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, particleBuffer.data());
 		// SSBO won't be changed on the host after upload so copy to device local memory
 		for (auto& storageBuffer : storageBuffers) {
 			// The SSBO will be used as a storage buffer for the compute pipeline and as a vertex buffer in the graphics pipeline
-			vulkanDevice->createBuffer(
+			vulkanDevice_->createBuffer(
 				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&storageBuffer,
 				storageBufferSize);
 
 			// Copy from staging buffer to storage buffer
-			VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 			VkBufferCopy copyRegion = { .size = storageBufferSize };
 			vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, storageBuffer.buffer, 1, &copyRegion);
 			// Execute an initial ownership transfer barrier to the compute queue if graphics and compute differ
@@ -168,7 +168,7 @@ public:
 					1, &buffer_barrier,
 					0, nullptr);
 			}
-			vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+			vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 		}
 		stagingBuffer.destroy();
 	}
@@ -269,7 +269,7 @@ public:
 		blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
 	}
 
 	void prepareCompute()
@@ -283,7 +283,7 @@ public:
 		// Separate command pool as queue family for compute may be different from the graphics one
 		VkCommandPoolCreateInfo cmdPoolInfo = {};
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		cmdPoolInfo.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		cmdPoolInfo.queueFamilyIndex = vulkanDevice_->queueFamilyIndices.compute;
 		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		VK_CHECK_RESULT(vkCreateCommandPool(device_, &cmdPoolInfo, nullptr, &compute.commandPool));
 
@@ -303,7 +303,7 @@ public:
 
 		// Dynamic parameters are passed to compute via uniform buffers
 		for (auto& buffer : compute.uniformBuffers) {
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(Compute::UniformData));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(Compute::UniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 
@@ -341,7 +341,7 @@ public:
 		VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCreateInfo, nullptr, &compute.pipelineLayout));
 		VkComputePipelineCreateInfo computePipelineCreateInfo = vks::initializers::computePipelineCreateInfo(compute.pipelineLayout, 0);
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computeparticles/particle.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
+		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache_, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
 	}
 
 	void updateUniformBuffers()
@@ -377,8 +377,8 @@ public:
 		VulkanExampleBase::prepare();
 		// We will be using the queue family indices to check if graphics and compute queue families differ
 		// If that's the case, we need additional barriers for acquiring and releasing resources
-		graphics.queueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-		compute.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		graphics.queueFamilyIndex = vulkanDevice_->queueFamilyIndices.graphics;
+		compute.queueFamilyIndex = vulkanDevice_->queueFamilyIndices.compute;
 		loadAssets();
 		setupDescriptorPool();
 		prepareGraphics();
@@ -388,7 +388,7 @@ public:
 
 	void buildGraphicsCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

@@ -104,7 +104,7 @@ public:
 	{
 		title = "Basic indexed triangle using Vulkan 1.3";
 		// To keep things simple, we don't use the UI overlay from the framework
-		settings.overlay = false;
+		settings_.overlay = false;
 		// Setup a default look-at camera
 		camera_.type = Camera::CameraType::lookat;
 		camera_.setPosition(glm::vec3(0.0f, 0.0f, -2.5f));
@@ -114,7 +114,7 @@ public:
 		apiVersion = VK_API_VERSION_1_3;
 		enabledFeatures.dynamicRendering = VK_TRUE;
 		enabledFeatures.synchronization2 = VK_TRUE;
-		deviceCreatepNextChain = &enabledFeatures;
+		deviceCreatepNextChain_ = &enabledFeatures;
 	}
 
 	~VulkanExample() override
@@ -147,7 +147,7 @@ public:
 	virtual void getEnabledFeatures() override
 	{
 		// Vulkan 1.3 device support is required for this example
-		if (deviceProperties.apiVersion < VK_API_VERSION_1_3) {
+		if (deviceProperties_.apiVersion < VK_API_VERSION_1_3) {
 			vks::tools::exitFatal("Selected GPU does not support support Vulkan 1.3", VK_ERROR_INCOMPATIBLE_DRIVER);
 		}
 	}
@@ -407,7 +407,7 @@ public:
 		// Create an optimal tiled image used as the depth stencil attachment
 		VkImageCreateInfo imageCI{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.format = depthFormat;
+		imageCI.format = depthFormat_;
 		imageCI.extent = { width_, height_, 1 };
 		imageCI.mipLevels = 1;
 		imageCI.arrayLayers = 1;
@@ -415,35 +415,35 @@ public:
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(device_, &imageCI, nullptr, &depthStencil.image));
+		VK_CHECK_RESULT(vkCreateImage(device_, &imageCI, nullptr, &depthStencil_.image));
 
 		// Allocate memory for the image (device local) and bind it to our image
 		VkMemoryAllocateInfo memAlloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device_, depthStencil.image, &memReqs);
+		vkGetImageMemoryRequirements(device_, depthStencil_.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &depthStencil.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(device_, depthStencil.image, depthStencil.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &depthStencil_.memory));
+		VK_CHECK_RESULT(vkBindImageMemory(device_, depthStencil_.image, depthStencil_.memory, 0));
 
 		// Create a view for the depth stencil image
 		// Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
 		// This allows for multiple views of one image with differing ranges (e.g. for different layers)
 		VkImageViewCreateInfo depthStencilViewCI{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 		depthStencilViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		depthStencilViewCI.format = depthFormat;
+		depthStencilViewCI.format = depthFormat_;
 		depthStencilViewCI.subresourceRange = {};
 		depthStencilViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		// Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT)
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+		if (depthFormat_ >= VK_FORMAT_D16_UNORM_S8_UINT) {
 			depthStencilViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
 		depthStencilViewCI.subresourceRange.baseMipLevel = 0;
 		depthStencilViewCI.subresourceRange.levelCount = 1;
 		depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
 		depthStencilViewCI.subresourceRange.layerCount = 1;
-		depthStencilViewCI.image = depthStencil.image;
-		VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilViewCI, nullptr, &depthStencil.view));
+		depthStencilViewCI.image = depthStencil_.image;
+		VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilViewCI, nullptr, &depthStencil_.view));
 	}
 
 	// Vulkan loads its shaders from an immediate binary representation called SPIR-V
@@ -628,8 +628,8 @@ public:
 		VkPipelineRenderingCreateInfoKHR pipelineRenderingCI{ VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
 		pipelineRenderingCI.colorAttachmentCount = 1;
 		pipelineRenderingCI.pColorAttachmentFormats = &swapChain_.colorFormat;
-		pipelineRenderingCI.depthAttachmentFormat = depthFormat;
-		pipelineRenderingCI.stencilAttachmentFormat = depthFormat;
+		pipelineRenderingCI.depthAttachmentFormat = depthFormat_;
+		pipelineRenderingCI.stencilAttachmentFormat = depthFormat_;
 
 		// Assign the pipeline states to the pipeline creation info structure
 		pipelineCI.pVertexInputState = &vertexInputStateCI;
@@ -643,7 +643,7 @@ public:
 		pipelineCI.pNext = &pipelineRenderingCI;
 
 		// Create rendering pipeline using the specified states
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 
 		// Shader modules can safely be destroyed when the pipeline has been created
 		vkDestroyShaderModule(device_, shaderStages[0].module, nullptr);
@@ -727,7 +727,7 @@ public:
 
 		// With dynamic rendering we need to explicitly add layout transitions by using barriers, this set of barriers prepares the color and depth images for output
 		vks::tools::insertImageMemoryBarrier(commandBuffer, swapChain_.images[imageIndex], 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-		vks::tools::insertImageMemoryBarrier(commandBuffer, depthStencil.image, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 });
+		vks::tools::insertImageMemoryBarrier(commandBuffer, depthStencil_.image, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 });
 
 		// New structures are used to define the attachments used in dynamic rendering
 		// Color attachment
@@ -739,7 +739,7 @@ public:
 		colorAttachment.clearValue.color = { 0.0f, 0.0f, 0.2f, 0.0f };
 		// Depth/stencil attachment
 		VkRenderingAttachmentInfo depthStencilAttachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
-		depthStencilAttachment.imageView = depthStencil.view;
+		depthStencilAttachment.imageView = depthStencil_.view;
 		depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

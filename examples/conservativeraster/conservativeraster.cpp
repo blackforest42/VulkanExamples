@@ -119,8 +119,8 @@ public:
 
 	void getEnabledFeatures()
 	{
-		enabledFeatures.fillModeNonSolid = deviceFeatures.fillModeNonSolid;
-		enabledFeatures.wideLines = deviceFeatures.wideLines;
+		enabledFeatures_.fillModeNonSolid = deviceFeatures_.fillModeNonSolid;
+		enabledFeatures_.wideLines = deviceFeatures_.wideLines;
 	}
 
 	/*
@@ -138,7 +138,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat fbDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice_, &fbDepthFormat);
 		assert(validDepthFormat);
 
 		// Color attachment
@@ -161,7 +161,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &offscreenPass_.color.image));
 		vkGetImageMemoryRequirements(device_, offscreenPass_.color.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreenPass_.color.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, offscreenPass_.color.image, offscreenPass_.color.mem, 0));
 
@@ -199,7 +199,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &offscreenPass_.depth.image));
 		vkGetImageMemoryRequirements(device_, offscreenPass_.depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreenPass_.depth.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, offscreenPass_.depth.image, offscreenPass_.depth.mem, 0));
 
@@ -330,13 +330,13 @@ public:
 		} stagingBuffers;
 
 		// Host visible source buffers (staging)
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffers.vertices,
 			vertexBufferSize,
 			vertexBuffer.data()));
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffers.indices,
@@ -344,20 +344,20 @@ public:
 			indexBuffer.data()));
 
 		// Device local destination buffers
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&triangle.vertices,
 			vertexBufferSize));
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&triangle.indices,
 			indexBufferSize));
 
 		// Copy from host do device
-		vulkanDevice->copyBuffer(&stagingBuffers.vertices, &triangle.vertices, queue_);
-		vulkanDevice->copyBuffer(&stagingBuffers.indices, &triangle.indices, queue_);
+		vulkanDevice_->copyBuffer(&stagingBuffers.vertices, &triangle.vertices, queue_);
+		vulkanDevice_->copyBuffer(&stagingBuffers.indices, &triangle.indices, queue_);
 
 		// Clean up
 		stagingBuffers.vertices.destroy();
@@ -450,7 +450,7 @@ public:
 		conservativeRasterProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONSERVATIVE_RASTERIZATION_PROPERTIES_EXT;
 		deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
 		deviceProps2.pNext = &conservativeRasterProps;
-		vkGetPhysicalDeviceProperties2KHR(physicalDevice, &deviceProps2);
+		vkGetPhysicalDeviceProperties2KHR(physicalDevice_, &deviceProps2);
 
 		// Vertex bindings and attributes
 		std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
@@ -484,7 +484,7 @@ public:
 		VkPipelineVertexInputStateCreateInfo emptyInputState = vks::initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCreateInfo.pVertexInputState = &emptyInputState;
 		pipelineCreateInfo.layout = pipelineLayouts_.fullscreen;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.fullscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.fullscreen));
 
 		pipelineCreateInfo.pVertexInputState = &vertexInputState;
 		pipelineCreateInfo.layout = pipelineLayouts_.scene;
@@ -495,7 +495,7 @@ public:
 		rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 		shaderStages[0] = loadShader(getShadersPath() + "conservativeraster/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "conservativeraster/triangleoverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.triangleOverlay));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.triangleOverlay));
 
 		pipelineCreateInfo.renderPass = offscreenPass_.renderPass;
 
@@ -509,7 +509,7 @@ public:
 		/*
 			Basic pipeline
 		*/
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.triangle));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.triangle));
 
 		/*
 			Pipeline with conservative rasterization enabled
@@ -522,7 +522,7 @@ public:
 		// Conservative rasterization state has to be chained into the pipeline rasterization state create info structure
 		rasterizationStateCI.pNext = &conservativeRasterStateCI;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.triangleConservativeRaster));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.triangleConservativeRaster));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -530,7 +530,7 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Scene matrices uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -555,7 +555,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

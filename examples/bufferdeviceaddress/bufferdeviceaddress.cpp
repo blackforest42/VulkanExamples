@@ -68,7 +68,7 @@ public:
 		enabledBufferDeviceAddresFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
 		enabledBufferDeviceAddresFeatures.bufferDeviceAddress = VK_TRUE;
 
-		deviceCreatepNextChain = &enabledBufferDeviceAddresFeatures;
+		deviceCreatepNextChain_ = &enabledBufferDeviceAddresFeatures;
 	}
 
 	~VulkanExample()
@@ -91,16 +91,16 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		};
 	}
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		model.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	// We pass all data via buffer device addresses, so we only allocate descriptors for the images
@@ -172,14 +172,14 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	void prepareUniformBuffers()
 	{
 		for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
 			// Note that we don't use this buffer for uniforms but rather pass it's address as a reference to the shader, so isntead of the uniform buffer usage we use a different flag
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene.buffers[i], sizeof(glm::mat4)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene.buffers[i], sizeof(glm::mat4)));
 			VK_CHECK_RESULT(scene.buffers[i].map());
 
 			// Get the device of this buffer that is later on passed to the shader (aka "reference")
@@ -190,7 +190,7 @@ public:
 
 			for (auto& cube : cubes) {
 				// Note that we don't use this buffer for uniforms but rather pass it's address as a reference to the shader, so isntead of the uniform buffer usage we use a different flag
-				VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &cube.buffers[i], sizeof(glm::mat4)));
+				VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &cube.buffers[i], sizeof(glm::mat4)));
 				VK_CHECK_RESULT(cube.buffers[i].map());
 
 				// Get the device of this buffer that is later on passed to the shader (aka "reference")
@@ -233,7 +233,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

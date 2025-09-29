@@ -75,7 +75,7 @@ class VulkanExample : public VulkanExampleBase {
                                 vkglTF::FileLoadingFlags::FlipY;
     // Skybox
     models_.skybox.loadFromFile(getAssetPath() + "models/cube.gltf",
-                                vulkanDevice, queue_, glTFLoadingFlags);
+                                vulkanDevice_, queue_, glTFLoadingFlags);
     // Objects
     std::vector<std::string> filenames = {"sphere.gltf", "teapot.gltf",
                                           "torusknot.gltf", "venus.gltf"};
@@ -83,7 +83,7 @@ class VulkanExample : public VulkanExampleBase {
     models_.objects.resize(filenames.size());
     for (size_t i = 0; i < filenames.size(); i++) {
       models_.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i],
-                                      vulkanDevice, queue_, glTFLoadingFlags);
+                                      vulkanDevice_, queue_, glTFLoadingFlags);
     }
     // Cubemap texture
     loadCubemap(getAssetPath() + "textures/blackhole/skybox/cubemap.ktx",
@@ -94,7 +94,7 @@ class VulkanExample : public VulkanExampleBase {
   // Prepare and initialize uniform buffer containing shader uniforms
   void prepareUniformBuffers() {
     for (auto& buffer : uniformBuffers_) {
-      VK_CHECK_RESULT(vulkanDevice->createBuffer(
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -219,7 +219,7 @@ class VulkanExample : public VulkanExampleBase {
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
     rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skybox));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skybox));
 
     // Cube map reflect pipeline
     shaderStages[0] =
@@ -233,7 +233,7 @@ class VulkanExample : public VulkanExampleBase {
     depthStencilState.depthTestEnable = VK_TRUE;
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.reflect));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.reflect));
   }
 
   // (B) Called in VulkanExampleBase::renderLoop()
@@ -259,7 +259,7 @@ class VulkanExample : public VulkanExampleBase {
 
   // (B.2)
   void buildCommandBuffer() {
-    VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+    VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();
@@ -368,7 +368,7 @@ class VulkanExample : public VulkanExampleBase {
     vkGetBufferMemoryRequirements(device_, stagingBuffer, &memReqs);
     memAllocInfo.allocationSize = memReqs.size;
     // Get memory type index for a host visible buffer
-    memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(
+    memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(
         memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VK_CHECK_RESULT(
@@ -406,7 +406,7 @@ class VulkanExample : public VulkanExampleBase {
     vkGetImageMemoryRequirements(device_, cubeMap_.image, &memReqs);
 
     memAllocInfo.allocationSize = memReqs.size;
-    memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(
+    memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(
         memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr,
@@ -414,7 +414,7 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(
         vkBindImageMemory(device_, cubeMap_.image, cubeMap_.deviceMemory, 0));
 
-    VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(
+    VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(
         VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
     // Setup buffer copy regions for each face including all of its miplevels
@@ -470,7 +470,7 @@ class VulkanExample : public VulkanExampleBase {
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                cubeMap_.imageLayout, subresourceRange);
 
-    vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+    vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
     // Create sampler
     VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
@@ -486,9 +486,9 @@ class VulkanExample : public VulkanExampleBase {
     sampler.maxLod = static_cast<float>(cubeMap_.mipLevels);
     sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
     sampler.maxAnisotropy = 1.0f;
-    if (vulkanDevice->features.samplerAnisotropy) {
+    if (vulkanDevice_->features.samplerAnisotropy) {
       sampler.maxAnisotropy =
-          vulkanDevice->properties.limits.maxSamplerAnisotropy;
+          vulkanDevice_->properties.limits.maxSamplerAnisotropy;
       sampler.anisotropyEnable = VK_TRUE;
     }
     VK_CHECK_RESULT(
@@ -515,8 +515,8 @@ class VulkanExample : public VulkanExampleBase {
 
   // Enable physical device features required for this example
   virtual void getEnabledFeatures() {
-    if (deviceFeatures.samplerAnisotropy) {
-      enabledFeatures.samplerAnisotropy = VK_TRUE;
+    if (deviceFeatures_.samplerAnisotropy) {
+      enabledFeatures_.samplerAnisotropy = VK_TRUE;
     }
   }
 

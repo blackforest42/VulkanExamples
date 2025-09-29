@@ -65,10 +65,10 @@ public:
 		enableExtensions();
 
 		// Buffer device address requires the 64-bit integer feature to be enabled
-		enabledFeatures.shaderInt64 = VK_TRUE;
+		enabledFeatures_.shaderInt64 = VK_TRUE;
 		// Format for the storage image is decided at runtime, so we can't explicilily state it in the shader
-		enabledFeatures.shaderStorageImageReadWithoutFormat = VK_TRUE;
-		enabledFeatures.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+		enabledFeatures_.shaderStorageImageReadWithoutFormat = VK_TRUE;
+		enabledFeatures_.shaderStorageImageWriteWithoutFormat = VK_TRUE;
 
 		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
 		enabledDeviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -112,7 +112,7 @@ public:
 		memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memoryAllocateInfo.pNext = &memoryAllocateFlagsInfo;
 		memoryAllocateInfo.allocationSize = memoryRequirements.size;
-		memoryAllocateInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memoryAllocateInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memoryAllocateInfo, nullptr, &accelerationStructure.memory));
 		VK_CHECK_RESULT(vkBindBufferMemory(device_, accelerationStructure.buffer, accelerationStructure.memory, 0));
 	}
@@ -138,7 +138,7 @@ public:
 		}
 
 		// Transform buffer
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&transformBuffer,
@@ -202,20 +202,20 @@ public:
 
 		vks::Buffer stagingBuffer;
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffer,
 			static_cast<uint32_t>(geometryNodes.size()) * sizeof(GeometryNode),
 			geometryNodes.data()));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&geometryNodesBuffer,
 			static_cast<uint32_t>(geometryNodes.size()) * sizeof(GeometryNode)));
 
-		vulkanDevice->copyBuffer(&stagingBuffer, &geometryNodesBuffer, queue_);
+		vulkanDevice_->copyBuffer(&stagingBuffer, &geometryNodesBuffer, queue_);
 
 		stagingBuffer.destroy();
 	
@@ -256,13 +256,13 @@ public:
 
 		// Build the acceleration structure on the device via a one-time command buffer submission
 		// Some implementations may support acceleration structure building on the host (VkPhysicalDeviceAccelerationStructureFeaturesKHR->accelerationStructureHostCommands), but we prefer device builds
-		VkCommandBuffer commandBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer commandBuffer = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		vkCmdBuildAccelerationStructuresKHR(
 			commandBuffer,
 			1,
 			&accelerationStructureBuildGeometryInfo,
 			pBuildRangeInfos.data());
-		vulkanDevice->flushCommandBuffer(commandBuffer, queue_);
+		vulkanDevice_->flushCommandBuffer(commandBuffer, queue_);
 
 		VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 		accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -293,7 +293,7 @@ public:
 
 		// Buffer for instance data
 		vks::Buffer instancesBuffer;
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&instancesBuffer,
@@ -364,13 +364,13 @@ public:
 
 		// Build the acceleration structure on the device via a one-time command buffer submission
 		// Some implementations may support acceleration structure building on the host (VkPhysicalDeviceAccelerationStructureFeaturesKHR->accelerationStructureHostCommands), but we prefer device builds
-		VkCommandBuffer commandBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer commandBuffer = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		vkCmdBuildAccelerationStructuresKHR(
 			commandBuffer,
 			1,
 			&accelerationBuildGeometryInfo,
 			accelerationBuildStructureRangeInfos.data());
-		vulkanDevice->flushCommandBuffer(commandBuffer, queue_);
+		vulkanDevice_->flushCommandBuffer(commandBuffer, queue_);
 
 		VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
 		accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -607,7 +607,7 @@ public:
 	void createUniformBuffer()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -625,7 +625,7 @@ public:
 			VkWriteDescriptorSet resultImageWrite = vks::initializers::writeDescriptorSet(descriptorSets_[i], VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor);
 			vkUpdateDescriptorSets(device_, 1, &resultImageWrite, 0, VK_NULL_HANDLE);
 		}
-		resized = false;
+		resized_ = false;
 	}
 
 	void updateUniformBuffers()
@@ -660,15 +660,15 @@ public:
 		physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
 		physicalDeviceDescriptorIndexingFeatures.pNext = &enabledAccelerationStructureFeatures;
 
-		deviceCreatepNextChain = &physicalDeviceDescriptorIndexingFeatures;
+		deviceCreatepNextChain_ = &physicalDeviceDescriptorIndexingFeatures;
 
-		enabledFeatures.samplerAnisotropy = VK_TRUE;
+		enabledFeatures_.samplerAnisotropy = VK_TRUE;
 	}
 
 	void loadAssets()
 	{
 		vkglTF::memoryPropertyFlags = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		model.loadFromFile(getAssetPath() + "models/FlightHelmet/glTF/FlightHelmet.gltf", vulkanDevice, queue_);
+		model.loadFromFile(getAssetPath() + "models/FlightHelmet/glTF/FlightHelmet.gltf", vulkanDevice_, queue_);
 	}
 
 	void prepare()
@@ -691,12 +691,12 @@ public:
 
 	void buildCommandBuffer()
 	{
-		if (resized)
+		if (resized_)
 		{
 			handleResize();
 		}
 
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

@@ -172,10 +172,10 @@ VulkanExample::~VulkanExample()
 
 void VulkanExample::getEnabledFeatures()
 {
-	if (deviceFeatures.sparseBinding && deviceFeatures.sparseResidencyImage2D) {
-		enabledFeatures.shaderResourceResidency = VK_TRUE;
-		enabledFeatures.sparseBinding = VK_TRUE;
-		enabledFeatures.sparseResidencyImage2D = VK_TRUE;
+	if (deviceFeatures_.sparseBinding && deviceFeatures_.sparseResidencyImage2D) {
+		enabledFeatures_.shaderResourceResidency = VK_TRUE;
+		enabledFeatures_.sparseBinding = VK_TRUE;
+		enabledFeatures_.sparseResidencyImage2D = VK_TRUE;
 	}
 	else {
 		std::cout << "Sparse binding not supported" << std::endl;
@@ -193,7 +193,7 @@ glm::uvec3 VulkanExample::alignedDivision(const VkExtent3D& extent, const VkExte
 
 void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32_t layerCount, VkFormat format)
 {
-	texture.device = vulkanDevice->logicalDevice;
+	texture.device = vulkanDevice_->logicalDevice;
 	texture.width = width;
 	texture.height = height;
 	texture.mipLevels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1);
@@ -203,7 +203,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	texture.subRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, texture.mipLevels, 0, 1 };
 	// Get device properties for the requested texture format
 	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+	vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &formatProperties);
 
 	const VkImageType imageType = VK_IMAGE_TYPE_2D;
 	const VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
@@ -214,7 +214,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	std::vector<VkSparseImageFormatProperties> sparseProperties;
 	// Sparse properties count for the desired format
 	uint32_t sparsePropertiesCount;
-	vkGetPhysicalDeviceSparseImageFormatProperties(physicalDevice, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, nullptr);
+	vkGetPhysicalDeviceSparseImageFormatProperties(physicalDevice_, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, nullptr);
 	// Check if sparse is supported for this format
 	if (sparsePropertiesCount == 0)
 	{
@@ -224,7 +224,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 
 	// Get actual image format properties
 	sparseProperties.resize(sparsePropertiesCount);
-	vkGetPhysicalDeviceSparseImageFormatProperties(physicalDevice, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, sparseProperties.data());
+	vkGetPhysicalDeviceSparseImageFormatProperties(physicalDevice_, format, imageType, sampleCount, imageUsage, imageTiling, &sparsePropertiesCount, sparseProperties.data());
 
 	std::cout << "Sparse image format properties: " << sparsePropertiesCount << std::endl;
 	for (auto props : sparseProperties)
@@ -249,9 +249,9 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	sparseImageCreateInfo.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
 	VK_CHECK_RESULT(vkCreateImage(device_, &sparseImageCreateInfo, nullptr, &texture.image));
 
-	VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	vks::tools::setImageLayout(copyCmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture.subRange);
-	vulkanDevice->flushCommandBuffer(copyCmd, queue_);
+	vulkanDevice_->flushCommandBuffer(copyCmd, queue_);
 
 	// Get memory requirements
 	VkMemoryRequirements sparseImageMemoryReqs;
@@ -263,7 +263,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	std::cout << "\t Alignment: " << sparseImageMemoryReqs.alignment << std::endl;
 
 	// Check requested image size against hardware sparse limit
-	if (sparseImageMemoryReqs.size > vulkanDevice->properties.limits.sparseAddressSpaceSize)
+	if (sparseImageMemoryReqs.size > vulkanDevice_->properties.limits.sparseAddressSpaceSize)
 	{
 		std::cout << "Error: Requested sparse image size exceeds supports sparse address space size!" << std::endl;
 		return;
@@ -316,7 +316,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	// @todo: proper comment
 	// Calculate number of required sparse memory bindings by alignment
 	assert((sparseImageMemoryReqs.size % sparseImageMemoryReqs.alignment) == 0);
-	texture.memoryTypeIndex = vulkanDevice->getMemoryType(sparseImageMemoryReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	texture.memoryTypeIndex = vulkanDevice_->getMemoryType(sparseImageMemoryReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	texture.sparseImageMemoryRequirements = sparseMemoryReq;
 
 	// The mip tail contains all mip levels > sparseMemoryReq.imageMipTailFirstLod
@@ -450,7 +450,7 @@ void VulkanExample::prepareSparseTexture(uint32_t width, uint32_t height, uint32
 	sampler.compareOp = VK_COMPARE_OP_NEVER;
 	sampler.minLod = 0.0f;
 	sampler.maxLod = static_cast<float>(texture.mipLevels);
-	sampler.maxAnisotropy = vulkanDevice->features.samplerAnisotropy ? vulkanDevice->properties.limits.maxSamplerAnisotropy : 1.0f;
+	sampler.maxAnisotropy = vulkanDevice_->features.samplerAnisotropy ? vulkanDevice_->properties.limits.maxSamplerAnisotropy : 1.0f;
 	sampler.anisotropyEnable = false;
 	sampler.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &texture.sampler));
@@ -486,7 +486,7 @@ void VulkanExample::destroyTextureImage(SparseTexture texture)
 void VulkanExample::loadAssets()
 {
 	const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-	plane.loadFromFile(getAssetPath() + "models/plane.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+	plane.loadFromFile(getAssetPath() + "models/plane.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 }
 
 void VulkanExample::setupDescriptors()
@@ -554,14 +554,14 @@ void VulkanExample::preparePipelines()
 
 	shaderStages[0] = loadShader(getShadersPath() + "texturesparseresidency/sparseresidency.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderStages[1] = loadShader(getShadersPath() + "texturesparseresidency/sparseresidency.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 }
 
 // Prepare and initialize uniform buffer containing shader uniforms
 void VulkanExample::prepareUniformBuffers()
 {
 	for (auto& buffer : uniformBuffers_) {
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 		VK_CHECK_RESULT(buffer.map());
 	}
 }
@@ -578,7 +578,7 @@ void VulkanExample::prepare()
 {
 	VulkanExampleBase::prepare();
 	// Check if the GPU supports sparse residency for 2D images
-	if (!vulkanDevice->features.sparseResidencyImage2D) {
+	if (!vulkanDevice_->features.sparseResidencyImage2D) {
 		vks::tools::exitFatal("Device does not support sparse residency for 2D images!", VK_ERROR_FEATURE_NOT_PRESENT);
 	}
 	loadAssets();
@@ -592,7 +592,7 @@ void VulkanExample::prepare()
 
 void VulkanExample::buildCommandBuffer()
 {
-	VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+	VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 	
 	VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -669,7 +669,7 @@ void VulkanExample::uploadContent(VirtualTexturePage page, VkImage image)
 	const size_t bufferSize = 4 * page.extent.width * page.extent.height;
 
 	vks::Buffer imageBuffer;
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&imageBuffer,
@@ -679,7 +679,7 @@ void VulkanExample::uploadContent(VirtualTexturePage page, VkImage image)
 	uint8_t* data = (uint8_t*)imageBuffer.mapped;
 	randomPattern(data, page.extent.height, page.extent.width);
 
-	VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	vks::tools::setImageLayout(copyCmd, image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.subRange, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	VkBufferImageCopy region{};
 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -689,7 +689,7 @@ void VulkanExample::uploadContent(VirtualTexturePage page, VkImage image)
 	region.imageExtent = page.extent;
 	vkCmdCopyBufferToImage(copyCmd, imageBuffer.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 	vks::tools::setImageLayout(copyCmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture.subRange, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-	vulkanDevice->flushCommandBuffer(copyCmd, queue_);
+	vulkanDevice_->flushCommandBuffer(copyCmd, queue_);
 
 	imageBuffer.destroy();
 }
@@ -760,7 +760,7 @@ void VulkanExample::fillMipTail()
 		const size_t bufferSize = 4 * width * height;
 
 		vks::Buffer imageBuffer;
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&imageBuffer,
@@ -774,7 +774,7 @@ void VulkanExample::fillMipTail()
 		uint8_t* data = (uint8_t*)imageBuffer.mapped;
 		randomPattern(data, width, height);
 
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		vks::tools::setImageLayout(copyCmd, texture.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.subRange, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		VkBufferImageCopy region{};
 		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -784,7 +784,7 @@ void VulkanExample::fillMipTail()
 		region.imageExtent = { width, height, 1 };
 		vkCmdCopyBufferToImage(copyCmd, imageBuffer.buffer, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 		vks::tools::setImageLayout(copyCmd, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture.subRange, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-		vulkanDevice->flushCommandBuffer(copyCmd, queue_);
+		vulkanDevice_->flushCommandBuffer(copyCmd, queue_);
 
 		imageBuffer.destroy();
 	}

@@ -148,7 +148,7 @@ public:
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
 
-		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Create cube map image
 		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &shadowCubeMap.image));
@@ -156,7 +156,7 @@ public:
 		vkGetImageMemoryRequirements(device_, shadowCubeMap.image, &memReqs);
 
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &shadowCubeMap.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, shadowCubeMap.image, shadowCubeMap.deviceMemory, 0));
 
@@ -173,7 +173,7 @@ public:
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(layoutCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(layoutCmd, queue_, true);
 
 		// Create sampler
 		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
@@ -222,7 +222,7 @@ public:
 		VkAttachmentDescription osAttachments[2] = {};
 
 		// Find a suitable depth format for
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &offscreenDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice_, &offscreenDepthFormat);
 		assert(validDepthFormat);
 
 		osAttachments[0].format = offscreenImageFormat;
@@ -302,7 +302,7 @@ public:
 		colorImageView.subresourceRange.baseArrayLayer = 0;
 		colorImageView.subresourceRange.layerCount = 1;
 
-		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Depth stencil attachment
 		imageCreateInfo.format = offscreenDepthFormat;
@@ -329,7 +329,7 @@ public:
 		
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreenPass_.depth.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, offscreenPass_.depth.image, offscreenPass_.depth.mem, 0));
 
@@ -340,7 +340,7 @@ public:
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-		vulkanDevice->flushCommandBuffer(layoutCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(layoutCmd, queue_, true);
 
 		depthStencilView.image = offscreenPass_.depth.image;
 		VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilView, nullptr, &offscreenPass_.depth.view));
@@ -366,8 +366,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.debugcube.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.scene.loadFromFile(getAssetPath() + "models/shadowscene_fire.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.debugcube.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.scene.loadFromFile(getAssetPath() + "models/shadowscene_fire.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -461,14 +461,14 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal});
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.scene));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.scene));
 
 		// Offscreen pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "shadowmappingomni/offscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "shadowmappingomni/offscreen.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		pipelineCI.layout = pipelineLayouts_.offscreen;
 		pipelineCI.renderPass = offscreenPass_.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.offscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.offscreen));
 
 		// Cube map display pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "shadowmappingomni/cubemapdisplay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -478,7 +478,7 @@ public:
 		pipelineCI.layout = pipelineLayouts_.scene;
 		pipelineCI.renderPass = renderPass_;
 		rasterizationState.cullMode = VK_CULL_MODE_NONE;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.cubemapDisplay));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.cubemapDisplay));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -486,9 +486,9 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Offscreen uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.offscreen, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.offscreen, sizeof(UniformData)));
 			// Scene uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.scene, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.scene, sizeof(UniformData)));
 			// Map persistent
 			VK_CHECK_RESULT(buffer.offscreen.map());
 			VK_CHECK_RESULT(buffer.scene.map());
@@ -596,7 +596,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

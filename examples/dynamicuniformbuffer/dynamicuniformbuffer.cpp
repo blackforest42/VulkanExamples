@@ -135,14 +135,14 @@ public:
 		// Create buffers
 		// For the sake of simplicity we won't stage the vertex data to the gpu memory
 		// Vertex buffer
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&vertexBuffer,
 			vertices.size() * sizeof(Vertex),
 			vertices.data()));
 		// Index buffer
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&indexBuffer,
@@ -233,7 +233,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -243,7 +243,7 @@ public:
 		// We allocate this manually as the alignment of the offset differs between GPUs
 
 		// Calculate required alignment based on minimum device offset alignment
-		size_t minUboAlignment = vulkanDevice->properties.limits.minUniformBufferOffsetAlignment;
+		size_t minUboAlignment = vulkanDevice_->properties.limits.minUniformBufferOffsetAlignment;
 		dynamicAlignment = sizeof(glm::mat4);
 		if (minUboAlignment > 0) {
 			dynamicAlignment = (dynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
@@ -259,14 +259,14 @@ public:
 
 		for (auto& buffer : uniformBuffers_) {
 			// Static shared uniform buffer object with projection and view matrix
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				&buffer.view,
 				sizeof(uboVS)));
 
 			// Uniform buffer object with per-object matrices
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 				&buffer.dynamic,
@@ -342,7 +342,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

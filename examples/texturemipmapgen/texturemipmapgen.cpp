@@ -76,8 +76,8 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	}
 
@@ -122,7 +122,7 @@ public:
 
 		// Get device properties for the requested texture format
 		VkFormatProperties formatProperties;
-		vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &formatProperties);
+		vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &formatProperties);
 		// Mip-chain generation requires support for blit source and destination
 		assert(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT);
 		assert(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT);
@@ -142,7 +142,7 @@ public:
 		VK_CHECK_RESULT(vkCreateBuffer(device_, &bufferCreateInfo, nullptr, &stagingBuffer));
 		vkGetBufferMemoryRequirements(device_, stagingBuffer, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &stagingMemory));
 		VK_CHECK_RESULT(vkBindBufferMemory(device_, stagingBuffer, stagingMemory, 0));
 
@@ -167,11 +167,11 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture.image));
 		vkGetImageMemoryRequirements(device_, texture.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, texture.image, texture.deviceMemory, 0));
 
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkImageSubresourceRange subresourceRange = {};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -214,7 +214,7 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 		// Clean up staging resources
 		vkFreeMemory(device_, stagingMemory, nullptr);
@@ -225,7 +225,7 @@ public:
 		// ---------------------------------------------------------------
 		// We copy down the whole mip chain doing a blit from mip-1 to mip
 		// An alternative way would be to always blit from the first mip level and sample that one down
-		VkCommandBuffer blitCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer blitCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Copy down mips from n-1 to n
 		for (uint32_t i = 1; i < texture.mipLevels; i++)
@@ -303,7 +303,7 @@ public:
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(blitCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(blitCmd, queue_, true);
 		// ---------------------------------------------------------------
 
 		// Create some samplers with different settings that can be selected via the UI
@@ -332,9 +332,9 @@ public:
 		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &samplers[1]));
 
 		// With mip mapping and anisotropic filtering
-		if (vulkanDevice->features.samplerAnisotropy)
+		if (vulkanDevice_->features.samplerAnisotropy)
 		{
-			sampler.maxAnisotropy = vulkanDevice->properties.limits.maxSamplerAnisotropy;
+			sampler.maxAnisotropy = vulkanDevice_->properties.limits.maxSamplerAnisotropy;
 			sampler.anisotropyEnable = VK_TRUE;
 		}
 		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &samplers[2]));
@@ -362,7 +362,7 @@ public:
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/tunnel_cylinder.gltf", vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+		model.loadFromFile(getAssetPath() + "models/tunnel_cylinder.gltf", vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 		loadTextureAndGenerateMips(getAssetPath() + "textures/metalplate_nomips_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM);
 	}
 
@@ -453,14 +453,14 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Normal });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -486,7 +486,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

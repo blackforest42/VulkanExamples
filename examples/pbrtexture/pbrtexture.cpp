@@ -105,22 +105,22 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	}
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.skybox.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.object.loadFromFile(getAssetPath() + "models/cerberus/cerberus.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		textures.environmentCube.loadFromFile(getAssetPath() + "textures/hdr/gcanyon_cube.ktx", VK_FORMAT_R16G16B16A16_SFLOAT, vulkanDevice, queue_);
-		textures.albedoMap.loadFromFile(getAssetPath() + "models/cerberus/albedo.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.normalMap.loadFromFile(getAssetPath() + "models/cerberus/normal.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.aoMap.loadFromFile(getAssetPath() + "models/cerberus/ao.ktx", VK_FORMAT_R8_UNORM, vulkanDevice, queue_);
-		textures.metallicMap.loadFromFile(getAssetPath() + "models/cerberus/metallic.ktx", VK_FORMAT_R8_UNORM, vulkanDevice, queue_);
-		textures.roughnessMap.loadFromFile(getAssetPath() + "models/cerberus/roughness.ktx", VK_FORMAT_R8_UNORM, vulkanDevice, queue_);
+		models_.skybox.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.object.loadFromFile(getAssetPath() + "models/cerberus/cerberus.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		textures.environmentCube.loadFromFile(getAssetPath() + "textures/hdr/gcanyon_cube.ktx", VK_FORMAT_R16G16B16A16_SFLOAT, vulkanDevice_, queue_);
+		textures.albedoMap.loadFromFile(getAssetPath() + "models/cerberus/albedo.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.normalMap.loadFromFile(getAssetPath() + "models/cerberus/normal.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.aoMap.loadFromFile(getAssetPath() + "models/cerberus/ao.ktx", VK_FORMAT_R8_UNORM, vulkanDevice_, queue_);
+		textures.metallicMap.loadFromFile(getAssetPath() + "models/cerberus/metallic.ktx", VK_FORMAT_R8_UNORM, vulkanDevice_, queue_);
+		textures.roughnessMap.loadFromFile(getAssetPath() + "models/cerberus/roughness.ktx", VK_FORMAT_R8_UNORM, vulkanDevice_, queue_);
 	}
 
 	void setupDescriptors()
@@ -214,7 +214,7 @@ public:
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		shaderStages[0] = loadShader(getShadersPath() + "pbrtexture/skybox.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pbrtexture/skybox.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skybox));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skybox));
 
 		// PBR pipeline
 		rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
@@ -223,7 +223,7 @@ public:
 		// Enable depth test and write
 		depthStencilState.depthWriteEnable = VK_TRUE;
 		depthStencilState.depthTestEnable = VK_TRUE;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.pbr));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.pbr));
 	}
 
 	// Generate a BRDF integration map used as a look-up-table (stores roughness / NdotV)
@@ -251,7 +251,7 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(device_, textures.lutBrdf.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &textures.lutBrdf.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, textures.lutBrdf.image, textures.lutBrdf.deviceMemory, 0));
 		// Image view
@@ -280,7 +280,7 @@ public:
 		textures.lutBrdf.descriptor.imageView = textures.lutBrdf.view;
 		textures.lutBrdf.descriptor.sampler = textures.lutBrdf.sampler;
 		textures.lutBrdf.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		textures.lutBrdf.device = vulkanDevice;
+		textures.lutBrdf.device = vulkanDevice_;
 
 		// FB, Att, RP, Pipe, etc.
 		VkAttachmentDescription attDesc = {};
@@ -391,7 +391,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "pbrtexture/genbrdflut.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pbrtexture/genbrdflut.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		VkPipeline pipeline;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 
 		// Render
 		VkClearValue clearValues[1];
@@ -405,7 +405,7 @@ public:
 		renderPassBeginInfo.pClearValues = clearValues;
 		renderPassBeginInfo.framebuffer = framebuffer;
 
-		VkCommandBuffer cmdBuf = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer cmdBuf = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		vkCmdBeginRenderPass(cmdBuf, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		VkViewport viewport = vks::initializers::viewport((float)dim, (float)dim, 0.0f, 1.0f);
 		VkRect2D scissor = vks::initializers::rect2D(dim, dim, 0, 0);
@@ -414,7 +414,7 @@ public:
 		vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 		vkCmdDraw(cmdBuf, 3, 1, 0, 0);
 		vkCmdEndRenderPass(cmdBuf);
-		vulkanDevice->flushCommandBuffer(cmdBuf, queue_);
+		vulkanDevice_->flushCommandBuffer(cmdBuf, queue_);
 
 		vkQueueWaitIdle(queue_);
 
@@ -458,7 +458,7 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(device_, textures.irradianceCube.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &textures.irradianceCube.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, textures.irradianceCube.image, textures.irradianceCube.deviceMemory, 0));
 		// Image view
@@ -487,7 +487,7 @@ public:
 		textures.irradianceCube.descriptor.imageView = textures.irradianceCube.view;
 		textures.irradianceCube.descriptor.sampler = textures.irradianceCube.sampler;
 		textures.irradianceCube.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		textures.irradianceCube.device = vulkanDevice;
+		textures.irradianceCube.device = vulkanDevice_;
 
 		// FB, Att, RP, Pipe, etc.
 		VkAttachmentDescription attDesc = {};
@@ -564,7 +564,7 @@ public:
 			VkMemoryRequirements memReqs;
 			vkGetImageMemoryRequirements(device_, offscreen.image, &memReqs);
 			memAlloc.allocationSize = memReqs.size;
-			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreen.memory));
 			VK_CHECK_RESULT(vkBindImageMemory(device_, offscreen.image, offscreen.memory, 0));
 
@@ -590,14 +590,14 @@ public:
 			fbufCreateInfo.layers = 1;
 			VK_CHECK_RESULT(vkCreateFramebuffer(device_, &fbufCreateInfo, nullptr, &offscreen.framebuffer));
 
-			VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			VkCommandBuffer layoutCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 			vks::tools::setImageLayout(
 				layoutCmd,
 				offscreen.image,
 				VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-			vulkanDevice->flushCommandBuffer(layoutCmd, queue_, true);
+			vulkanDevice_->flushCommandBuffer(layoutCmd, queue_, true);
 		}
 
 		// Descriptors
@@ -666,7 +666,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "pbrtexture/filtercube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pbrtexture/irradiancecube.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		VkPipeline pipeline;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 
 		// Render
 
@@ -697,7 +697,7 @@ public:
 			glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
 		};
 
-		VkCommandBuffer cmdBuf = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer cmdBuf = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkViewport viewport = vks::initializers::viewport((float)dim, (float)dim, 0.0f, 1.0f);
 		VkRect2D scissor = vks::initializers::rect2D(dim, dim, 0, 0);
@@ -792,7 +792,7 @@ public:
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(cmdBuf, queue_);
+		vulkanDevice_->flushCommandBuffer(cmdBuf, queue_);
 
 		vkDestroyRenderPass(device_, renderpass, nullptr);
 		vkDestroyFramebuffer(device_, offscreen.framebuffer, nullptr);
@@ -838,7 +838,7 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(device_, textures.prefilteredCube.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &textures.prefilteredCube.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, textures.prefilteredCube.image, textures.prefilteredCube.deviceMemory, 0));
 		// Image view
@@ -867,7 +867,7 @@ public:
 		textures.prefilteredCube.descriptor.imageView = textures.prefilteredCube.view;
 		textures.prefilteredCube.descriptor.sampler = textures.prefilteredCube.sampler;
 		textures.prefilteredCube.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		textures.prefilteredCube.device = vulkanDevice;
+		textures.prefilteredCube.device = vulkanDevice_;
 
 		// FB, Att, RP, Pipe, etc.
 		VkAttachmentDescription attDesc = {};
@@ -944,7 +944,7 @@ public:
 			VkMemoryRequirements memReqs;
 			vkGetImageMemoryRequirements(device_, offscreen.image, &memReqs);
 			memAlloc.allocationSize = memReqs.size;
-			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreen.memory));
 			VK_CHECK_RESULT(vkBindImageMemory(device_, offscreen.image, offscreen.memory, 0));
 
@@ -970,14 +970,14 @@ public:
 			fbufCreateInfo.layers = 1;
 			VK_CHECK_RESULT(vkCreateFramebuffer(device_, &fbufCreateInfo, nullptr, &offscreen.framebuffer));
 
-			VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			VkCommandBuffer layoutCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 			vks::tools::setImageLayout(
 				layoutCmd,
 				offscreen.image,
 				VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-			vulkanDevice->flushCommandBuffer(layoutCmd, queue_, true);
+			vulkanDevice_->flushCommandBuffer(layoutCmd, queue_, true);
 		}
 
 		// Descriptors
@@ -1045,7 +1045,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "pbrtexture/filtercube.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pbrtexture/prefilterenvmap.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		VkPipeline pipeline;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 
 		// Render
 
@@ -1076,7 +1076,7 @@ public:
 			glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
 		};
 
-		VkCommandBuffer cmdBuf = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer cmdBuf = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkViewport viewport = vks::initializers::viewport((float)dim, (float)dim, 0.0f, 1.0f);
 		VkRect2D scissor = vks::initializers::rect2D(dim, dim, 0, 0);
@@ -1172,7 +1172,7 @@ public:
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			subresourceRange);
 
-		vulkanDevice->flushCommandBuffer(cmdBuf, queue_);
+		vulkanDevice_->flushCommandBuffer(cmdBuf, queue_);
 
 		vkDestroyRenderPass(device_, renderpass, nullptr);
 		vkDestroyFramebuffer(device_, offscreen.framebuffer, nullptr);
@@ -1194,13 +1194,13 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Scene matrices uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.scene, sizeof(UniformDataMatrices)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.scene, sizeof(UniformDataMatrices)));
 			VK_CHECK_RESULT(buffer.scene.map());
 			// Skybox matrices uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.skybox, sizeof(UniformDataMatrices)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.skybox, sizeof(UniformDataMatrices)));
 			VK_CHECK_RESULT(buffer.skybox.map());
 			// Shared parameter uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.params, sizeof(UniformDataParams)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.params, sizeof(UniformDataParams)));
 			VK_CHECK_RESULT(buffer.params.map());
 		}
 	}
@@ -1243,7 +1243,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

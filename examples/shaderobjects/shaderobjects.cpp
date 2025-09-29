@@ -95,7 +95,7 @@ public:
 		enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
 		enabledDynamicRenderingFeaturesKHR.pNext = &enabledShaderObjectFeaturesEXT;
 
-		deviceCreatepNextChain = &enabledDynamicRenderingFeaturesKHR;
+		deviceCreatepNextChain_ = &enabledDynamicRenderingFeaturesKHR;
 	}
 
 	~VulkanExample()
@@ -114,7 +114,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -267,7 +267,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -322,7 +322,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -341,7 +341,7 @@ public:
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 		vks::tools::insertImageMemoryBarrier(
 			cmdBuffer,
-			depthStencil.image,
+			depthStencil_.image,
 			0,
 			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 			VK_IMAGE_LAYOUT_UNDEFINED,
@@ -363,7 +363,7 @@ public:
 		// When both are specified separately, the only requirement is that the image view is identical.			
 		VkRenderingAttachmentInfoKHR depthStencilAttachment{};
 		depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-		depthStencilAttachment.imageView = depthStencil.view;
+		depthStencilAttachment.imageView = depthStencil_.view;
 		depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;

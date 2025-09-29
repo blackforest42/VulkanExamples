@@ -79,10 +79,10 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		};
-		wireframe = deviceFeatures.fillModeNonSolid;
+		wireframe = deviceFeatures_.fillModeNonSolid;
 	}
 
 	~VulkanExample()
@@ -255,7 +255,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat fbDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice_, &fbDepthFormat);
 		assert(validDepthFormat);
 
 		// Color attachment
@@ -278,7 +278,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &offscreenPass_.color.image));
 		vkGetImageMemoryRequirements(device_, offscreenPass_.color.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreenPass_.color.memory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, offscreenPass_.color.image, offscreenPass_.color.memory, 0));
 
@@ -316,7 +316,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &offscreenPass_.depth.image));
 		vkGetImageMemoryRequirements(device_, offscreenPass_.depth.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &offscreenPass_.depth.memory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, offscreenPass_.depth.image, offscreenPass_.depth.memory, 0));
 
@@ -418,8 +418,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.sceneGlow.loadFromFile(getAssetPath() + "models/treasure_glow.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.sceneGlow.loadFromFile(getAssetPath() + "models/treasure_glow.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	// We use a custom draw function so we can insert debug labels with the names of the glTF nodes
@@ -502,20 +502,20 @@ public:
 		// Toon shading pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "debugutils/toon.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "debugutils/toon.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.toonshading));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.toonshading));
 
 		// Color only pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "debugutils/colorpass.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "debugutils/colorpass.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		pipelineCI.renderPass = offscreenPass_.renderPass;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.color));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.color));
 
 		// Wire frame rendering pipeline
-		if (deviceFeatures.fillModeNonSolid)
+		if (deviceFeatures_.fillModeNonSolid)
 		{
 			rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 			pipelineCI.renderPass = renderPass_;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
 		}
 
 		// Post processing effect
@@ -533,7 +533,7 @@ public:
 		blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
 		blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.postprocess));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.postprocess));
 	}
 
 	// For convencience we name our Vulkan objects in a single place
@@ -550,7 +550,7 @@ public:
 		setObjectName(device_, VK_OBJECT_TYPE_BUFFER, (uint64_t)models_.sceneGlow.indices.buffer, "Glow index buffer");
 		
 		// Shader module count starts at 2 when UI overlay in base class is enabled
-		uint32_t moduleIndex = settings.overlay ? 2 : 0;
+		uint32_t moduleIndex = settings_.overlay ? 2 : 0;
 		setObjectName(device_, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)shaderModules_[moduleIndex + 0], "Toon shading vertex shader");
 		setObjectName(device_, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)shaderModules_[moduleIndex + 1], "Toon shading fragment shader");
 		setObjectName(device_, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)shaderModules_[moduleIndex + 2], "Color-only vertex shader");
@@ -561,7 +561,7 @@ public:
 		setObjectName(device_, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pipelineLayout, "Shared pipeline layout");
 		setObjectName(device_, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines_.toonshading, "Toon shading pipeline");
 		setObjectName(device_, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines_.color, "Color only pipeline");
-		if (deviceFeatures.fillModeNonSolid) {
+		if (deviceFeatures_.fillModeNonSolid) {
 			setObjectName(device_, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines_.wireframe, "Wireframe rendering pipeline");
 		}
 		setObjectName(device_, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelines_.postprocess, "Post processing pipeline");
@@ -578,7 +578,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -605,7 +605,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
@@ -751,7 +751,7 @@ public:
 		}
 		if (overlay->header("Settings")) {
 			overlay->checkBox("Glow", &glow);
-			if (deviceFeatures.fillModeNonSolid) {
+			if (deviceFeatures_.fillModeNonSolid) {
 				overlay->checkBox("Wireframe", &wireframe);
 			}
 		}

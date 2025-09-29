@@ -78,7 +78,7 @@ public:
 		camera_.setPosition(glm::vec3(1.65f, 1.75f, -6.15f));
 		camera_.setRotation(glm::vec3(-12.75f, 380.0f, 0.0f));
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
-		ui.subpass = 1;
+		ui_.subpass = 1;
 	}
 
 	~VulkanExample()
@@ -146,7 +146,7 @@ public:
 		VkMemoryRequirements memReqs;
 		vkGetImageMemoryRequirements(device_, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &attachment->memory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, attachment->image, attachment->memory, 0));
 
@@ -175,7 +175,7 @@ public:
 			clearAttachment(&attachments.color);
 			clearAttachment(&attachments.depth);
 			createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments.color);
-			createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments.depth);
+			createAttachment(depthFormat_, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments.depth);
 
 			vkDestroyPipelineLayout(device_, pipelineLayouts_.attachmentWrite, nullptr);
 			vkDestroyPipelineLayout(device_, pipelineLayouts_.attachmentRead, nullptr);
@@ -214,7 +214,7 @@ public:
 		attachmentSize = { width_, height_ };		
 
 		createAttachment(colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &attachments.color);
-		createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments.depth);
+		createAttachment(depthFormat_, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &attachments.depth);
 
 		std::array<VkAttachmentDescription, 3> attachments{};
 
@@ -243,7 +243,7 @@ public:
 		attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		// Depth
-		attachments[2].format = depthFormat;
+		attachments[2].format = depthFormat_;
 		attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -331,7 +331,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void updateAttachmentReadDescriptors(uint32_t index)
@@ -445,7 +445,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentwrite.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.attachmentWrite));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.attachmentWrite));
 
 		/*
 			Attachment read
@@ -465,15 +465,15 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "inputattachments/attachmentread.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "inputattachments/attachmentread.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.attachmentRead));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.attachmentRead));
 	}
 
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.matrices, sizeof(uboMatrices));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.matrices, sizeof(uboMatrices));
 			VK_CHECK_RESULT(buffer.matrices.map());
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.params, sizeof(uboParams));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.params, sizeof(uboParams));
 			VK_CHECK_RESULT(buffer.params.map());
 		}
 		updateUniformBuffers();
@@ -500,7 +500,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

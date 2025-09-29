@@ -134,7 +134,7 @@ public:
 	{
 		// The actual commands are issued in secondary command buffers, this also applies to the background and the user interface
 		for (uint32_t i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
-			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY, 1);
+			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(cmdPool_, VK_COMMAND_BUFFER_LEVEL_SECONDARY, 1);
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device_, &cmdBufAllocateInfo, &secondaryCommandBuffers[i].background));
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device_, &cmdBufAllocateInfo, &secondaryCommandBuffers[i].ui));
 		}
@@ -303,8 +303,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.ufo.loadFromFile(getAssetPath() + "models/retroufo_red_lowpoly.gltf",vulkanDevice, queue_,glTFLoadingFlags);
-		models_.starSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.ufo.loadFromFile(getAssetPath() + "models/retroufo_red_lowpoly.gltf",vulkanDevice_, queue_,glTFLoadingFlags);
+		models_.starSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void preparePipelines()
@@ -345,14 +345,14 @@ public:
 		// Object rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "multithreading/phong.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multithreading/phong.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.phong));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.phong));
 
 		// Star sphere rendering pipeline
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		depthStencilState.depthWriteEnable = VK_FALSE;
 		shaderStages[0] = loadShader(getShadersPath() + "multithreading/starsphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multithreading/starsphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.starsphere));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.starsphere));
 	}
 
 	void updateMatrices()
@@ -377,7 +377,7 @@ public:
 	// lat submitted to the queue for rendering
 	void updateCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		// Contains the list of secondary command buffers to be submitted
 		std::vector<VkCommandBuffer> commandBuffers;
@@ -398,11 +398,11 @@ public:
 		renderPassBeginInfo.pClearValues = clearValues;
 		renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
 
-		VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[currentBuffer_], &cmdBufInfo));
+		VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers_[currentBuffer_], &cmdBufInfo));
 
 		// The primary command buffer does not contain any rendering commands
 		// These are stored (and retrieved) from the secondary command buffers
-		vkCmdBeginRenderPass(drawCmdBuffers[currentBuffer_], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+		vkCmdBeginRenderPass(drawCmdBuffers_[currentBuffer_], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
 		// Inheritance info for the secondary command buffers
 		VkCommandBufferInheritanceInfo inheritanceInfo = vks::initializers::commandBufferInheritanceInfo();
@@ -436,16 +436,16 @@ public:
 		}
 
 		// Render ui last
-		if (ui.visible) {
+		if (ui_.visible) {
 			commandBuffers.push_back(secondaryCommandBuffers[currentBuffer_].ui);
 		}
 
 		// Execute render commands from the secondary command buffer
-		vkCmdExecuteCommands(drawCmdBuffers[currentBuffer_], static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+		vkCmdExecuteCommands(drawCmdBuffers_[currentBuffer_], static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
-		vkCmdEndRenderPass(drawCmdBuffers[currentBuffer_]);
+		vkCmdEndRenderPass(drawCmdBuffers_[currentBuffer_]);
 
-		VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[currentBuffer_]));
+		VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers_[currentBuffer_]));
 	}
 
 

@@ -129,8 +129,8 @@ public:
 
 	void loadAssets()
 	{
-		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.particle.loadFromFile(getAssetPath() + "textures/particle01_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.gradient.loadFromFile(getAssetPath() + "textures/particle_gradient_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	// Setup and fill the compute shader storage buffers containing the particles
@@ -196,12 +196,12 @@ public:
 
 		vks::Buffer stagingBuffer;
 
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, particleBuffer.data());
+		vulkanDevice_->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, particleBuffer.data());
 		// The SSBO will be used as a storage buffer for the compute pipeline and as a vertex buffer in the graphics pipeline
-		vulkanDevice->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &storageBuffer, storageBufferSize);
+		vulkanDevice_->createBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &storageBuffer, storageBufferSize);
 
 		// Copy from staging buffer to storage buffer
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = storageBufferSize;
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, storageBuffer.buffer, 1, &copyRegion);
@@ -230,7 +230,7 @@ public:
 				1, &buffer_barrier,
 				0, nullptr);
 		}
-		vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 		stagingBuffer.destroy();
 	}
@@ -251,7 +251,7 @@ public:
 	{
 		// Vertex shader uniform buffer block
 		for (auto& buffer : graphics.uniformBuffers) {
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(Graphics::UniformData));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(Graphics::UniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 
@@ -337,7 +337,7 @@ public:
 		blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &graphics.pipeline));
 	}
 
 	void prepareCompute()
@@ -350,7 +350,7 @@ public:
 
 		// Compute shader uniform buffer block
 		for (auto& buffer : compute.uniformBuffers) {
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(Compute::UniformData));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(Compute::UniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 
@@ -388,16 +388,16 @@ public:
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_calculate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
 
 		// We want to use as much shared memory for the compute shader invocations as available, so we calculate it based on the device limits and pass it to the shader via specialization constants
-		uint32_t sharedDataSize = std::min((uint32_t)1024, (uint32_t)(vulkanDevice->properties.limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
+		uint32_t sharedDataSize = std::min((uint32_t)1024, (uint32_t)(vulkanDevice_->properties.limits.maxComputeSharedMemorySize / sizeof(glm::vec4)));
 		VkSpecializationMapEntry specializationMapEntry = vks::initializers::specializationMapEntry(0, 0, sizeof(uint32_t));
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(1, &specializationMapEntry, sizeof(int32_t), &sharedDataSize);
 		computePipelineCreateInfo.stage.pSpecializationInfo = &specializationInfo;
 
-		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineCalculate));
+		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache_, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineCalculate));
 
 		// 2nd pass
 		computePipelineCreateInfo.stage = loadShader(getShadersPath() + "computenbody/particle_integrate.comp.spv", VK_SHADER_STAGE_COMPUTE_BIT);
-		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineIntegrate));
+		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache_, 1, &computePipelineCreateInfo, nullptr, &compute.pipelineIntegrate));
 
 		// Separate command pool as queue family for compute may be different than graphics
 		VkCommandPoolCreateInfo cmdPoolInfo = vks::initializers::commandPoolCreateInfo();
@@ -407,7 +407,7 @@ public:
 
 		// Create command buffers for compute operations
 		for (auto& cmdBuffer : compute.commandBuffers) {
-			cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
+			cmdBuffer = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
 		}
 
 		// Fences to check for command buffer completion
@@ -448,8 +448,8 @@ public:
 		VulkanExampleBase::prepare();
 		// We will be using the queue family indices to check if graphics and compute queue families differ
 		// If that's the case, we need additional barriers for acquiring and releasing resources
-		graphics.queueFamilyIndex = vulkanDevice->queueFamilyIndices.graphics;
-		compute.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		graphics.queueFamilyIndex = vulkanDevice_->queueFamilyIndices.graphics;
+		compute.queueFamilyIndex = vulkanDevice_->queueFamilyIndices.compute;
 		loadAssets();
 		prepareDescriptorPool();
 		prepareStorageBuffers();
@@ -460,7 +460,7 @@ public:
 
 	void buildGraphicsCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -676,8 +676,8 @@ public:
 
 		// Submit graphics commands
 		{
-			VK_CHECK_RESULT(vkWaitForFences(device_, 1, &waitFences[currentBuffer_], VK_TRUE, UINT64_MAX));
-			VK_CHECK_RESULT(vkResetFences(device_, 1, &waitFences[currentBuffer_]));
+			VK_CHECK_RESULT(vkWaitForFences(device_, 1, &waitFences_[currentBuffer_], VK_TRUE, UINT64_MAX));
+			VK_CHECK_RESULT(vkResetFences(device_, 1, &waitFences_[currentBuffer_]));
 
 			VulkanExampleBase::prepareFrame(false);
 
@@ -685,18 +685,18 @@ public:
 			buildGraphicsCommandBuffer();
 
 			VkPipelineStageFlags waitDstStageMask[2] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT };
-			VkSemaphore waitSemaphores[2] = { presentCompleteSemaphores[currentBuffer_], compute.semaphores[currentBuffer_].complete };
-			VkSemaphore signalSemaphores[2] = { renderCompleteSemaphores[currentImageIndex_], compute.semaphores[currentBuffer_].ready };
+			VkSemaphore waitSemaphores[2] = { presentCompleteSemaphores_[currentBuffer_], compute.semaphores[currentBuffer_].complete };
+			VkSemaphore signalSemaphores[2] = { renderCompleteSemaphores_[currentImageIndex_], compute.semaphores[currentBuffer_].ready };
 
 			VkSubmitInfo submitInfo = vks::initializers::submitInfo();
 			submitInfo.waitSemaphoreCount = 2;
 			submitInfo.pWaitSemaphores = waitSemaphores;
 			submitInfo.pWaitDstStageMask = waitDstStageMask;
 			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer_];
+			submitInfo.pCommandBuffers = &drawCmdBuffers_[currentBuffer_];
 			submitInfo.signalSemaphoreCount = 2;
 			submitInfo.pSignalSemaphores = signalSemaphores;
-			VK_CHECK_RESULT(vkQueueSubmit(queue_, 1, &submitInfo, waitFences[currentBuffer_]));
+			VK_CHECK_RESULT(vkQueueSubmit(queue_, 1, &submitInfo, waitFences_[currentBuffer_]));
 
 			VulkanExampleBase::submitFrame(true);
 		}

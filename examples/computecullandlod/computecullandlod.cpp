@@ -131,18 +131,18 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable multi draw indirect if supported
-		if (deviceFeatures.multiDrawIndirect) {
-			enabledFeatures.multiDrawIndirect = VK_TRUE;
+		if (deviceFeatures_.multiDrawIndirect) {
+			enabledFeatures_.multiDrawIndirect = VK_TRUE;
 		}
 		// This is required for for using firstInstance
-		enabledFeatures.drawIndirectFirstInstance = VK_TRUE;
+		enabledFeatures_.drawIndirectFirstInstance = VK_TRUE;
 	}
 
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		lodModel.loadFromFile(getAssetPath() + "models/suzanne_lods.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		lodModel.loadFromFile(getAssetPath() + "models/suzanne_lods.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void prepareDescriptorPool()
@@ -237,7 +237,7 @@ public:
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipeline));
 	}
 
 	void prepareBuffers()
@@ -263,7 +263,7 @@ public:
 
 		indirectStats.drawCount = static_cast<uint32_t>(indirectCommands.size());
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffer,
@@ -271,19 +271,19 @@ public:
 			indirectCommands.data()));
 
 		for (auto& indirectCommandsBuffer : indirectCommandsBuffers) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 				VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				&indirectCommandsBuffer,
 				stagingBuffer.size));
 
-			vulkanDevice->copyBuffer(&stagingBuffer, &indirectCommandsBuffer, queue_);
+			vulkanDevice_->copyBuffer(&stagingBuffer, &indirectCommandsBuffer, queue_);
 
 			// Add an initial release barrier to the graphics queue,
 			// so that when the compute command buffer executes for the first time
 			// it doesn't complain about a lack of a corresponding "release" to its "acquire"
-			VkCommandBuffer barrierCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-			if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+			VkCommandBuffer barrierCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			if (vulkanDevice_->queueFamilyIndices.graphics != vulkanDevice_->queueFamilyIndices.compute)
 			{
 				VkBufferMemoryBarrier buffer_barrier =
 				{
@@ -291,8 +291,8 @@ public:
 					nullptr,
 					VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
 					0,
-					vulkanDevice->queueFamilyIndices.graphics,
-					vulkanDevice->queueFamilyIndices.compute,
+					vulkanDevice_->queueFamilyIndices.graphics,
+					vulkanDevice_->queueFamilyIndices.compute,
 					indirectCommandsBuffer.buffer,
 					0,
 					indirectCommandsBuffer.descriptor.range
@@ -307,7 +307,7 @@ public:
 					1, &buffer_barrier,
 					0, nullptr);
 			}
-			vulkanDevice->flushCommandBuffer(barrierCmd, queue_, true);
+			vulkanDevice_->flushCommandBuffer(barrierCmd, queue_, true);
 		}
 
 		stagingBuffer.destroy();
@@ -325,27 +325,27 @@ public:
 			}
 		}
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffer,
 			instanceData.size() * sizeof(InstanceData),
 			instanceData.data()));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&instanceBuffer,
 			stagingBuffer.size));
 
-		vulkanDevice->copyBuffer(&stagingBuffer, &instanceBuffer, queue_);
+		vulkanDevice_->copyBuffer(&stagingBuffer, &instanceBuffer, queue_);
 
 		stagingBuffer.destroy();
 
 		// Draw count buffer for host side info readback
 		for (auto& indirectDrawCountBuffer : indirectDrawCountBuffers) {
 
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				&indirectDrawCountBuffer,
@@ -376,26 +376,26 @@ public:
 			LODLevels.push_back(lod);
 		}
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffer,
 			LODLevels.size() * sizeof(LOD),
 			LODLevels.data()));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&compute.lodLevelsBuffers,
 			stagingBuffer.size));
 
-		vulkanDevice->copyBuffer(&stagingBuffer, &compute.lodLevelsBuffers, queue_);
+		vulkanDevice_->copyBuffer(&stagingBuffer, &compute.lodLevelsBuffers, queue_);
 
 		stagingBuffer.destroy();
 
 		// Scene uniform buffer
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -403,7 +403,7 @@ public:
 	void prepareCompute()
 	{
 		// Get a compute capable device queue
-		vkGetDeviceQueue(device_, vulkanDevice->queueFamilyIndices.compute, 0, &compute.queue);
+		vkGetDeviceQueue(device_, vulkanDevice_->queueFamilyIndices.compute, 0, &compute.queue);
 
 		// Create compute pipeline
 		// Compute pipelines are created separate from graphics pipelines even if they use the same queue (family index)
@@ -464,18 +464,18 @@ public:
 
 		computePipelineCreateInfo.stage.pSpecializationInfo = &specializationInfo;
 
-		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
+		VK_CHECK_RESULT(vkCreateComputePipelines(device_, pipelineCache_, 1, &computePipelineCreateInfo, nullptr, &compute.pipeline));
 
 		// Separate command pool as queue family for compute may be different than graphics
 		VkCommandPoolCreateInfo cmdPoolInfo = {};
 		cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		cmdPoolInfo.queueFamilyIndex = vulkanDevice->queueFamilyIndices.compute;
+		cmdPoolInfo.queueFamilyIndex = vulkanDevice_->queueFamilyIndices.compute;
 		cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		VK_CHECK_RESULT(vkCreateCommandPool(device_, &cmdPoolInfo, nullptr, &compute.commandPool));
 
 		// Create command buffers for compute operations
 		for (auto& cmdBuffer : compute.commandBuffers) {
-			cmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
+			cmdBuffer = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute.commandPool);
 		}
 
 		// Fences to check for command buffer completion
@@ -522,7 +522,7 @@ public:
 
 	void buildGraphicsCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -541,7 +541,7 @@ public:
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
 
 		// Acquire barrier
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (vulkanDevice_->queueFamilyIndices.graphics != vulkanDevice_->queueFamilyIndices.compute)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
 			{
@@ -549,8 +549,8 @@ public:
 				nullptr,
 				0,
 				VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
-				vulkanDevice->queueFamilyIndices.compute,
-				vulkanDevice->queueFamilyIndices.graphics,
+				vulkanDevice_->queueFamilyIndices.compute,
+				vulkanDevice_->queueFamilyIndices.graphics,
 				indirectCommandsBuffers[currentBuffer_].buffer,
 				0,
 				indirectCommandsBuffers[currentBuffer_].descriptor.range
@@ -584,7 +584,7 @@ public:
 
 		vkCmdBindIndexBuffer(cmdBuffer, lodModel.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-		if (vulkanDevice->features.multiDrawIndirect)
+		if (vulkanDevice_->features.multiDrawIndirect)
 		{
 			vkCmdDrawIndexedIndirect(cmdBuffer, indirectCommandsBuffers[currentBuffer_].buffer, 0, static_cast<uint32_t>(indirectCommands.size()), sizeof(VkDrawIndexedIndirectCommand));
 		}
@@ -602,7 +602,7 @@ public:
 		vkCmdEndRenderPass(cmdBuffer);
 
 		// Release barrier
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (vulkanDevice_->queueFamilyIndices.graphics != vulkanDevice_->queueFamilyIndices.compute)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
 			{
@@ -610,8 +610,8 @@ public:
 				nullptr,
 				VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
 				0,
-				vulkanDevice->queueFamilyIndices.graphics,
-				vulkanDevice->queueFamilyIndices.compute,
+				vulkanDevice_->queueFamilyIndices.graphics,
+				vulkanDevice_->queueFamilyIndices.compute,
 				indirectCommandsBuffers[currentBuffer_].buffer,
 				0,
 				indirectCommandsBuffers[currentBuffer_].descriptor.range
@@ -641,7 +641,7 @@ public:
 
 		// Acquire barrier
 		// Add memory barrier to ensure that the indirect commands have been consumed before the compute shader updates them
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (vulkanDevice_->queueFamilyIndices.graphics != vulkanDevice_->queueFamilyIndices.compute)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
 			{
@@ -649,8 +649,8 @@ public:
 				nullptr,
 				0,
 				VK_ACCESS_SHADER_WRITE_BIT,
-				vulkanDevice->queueFamilyIndices.graphics,
-				vulkanDevice->queueFamilyIndices.compute,
+				vulkanDevice_->queueFamilyIndices.graphics,
+				vulkanDevice_->queueFamilyIndices.compute,
 				indirectCommandsBuffers[currentBuffer_].buffer,
 				0,
 				indirectCommandsBuffers[currentBuffer_].descriptor.range
@@ -693,7 +693,7 @@ public:
 
 		// Release barrier
 		// Add memory barrier to ensure that the compute shader has finished writing the indirect command buffer before it's consumed
-		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
+		if (vulkanDevice_->queueFamilyIndices.graphics != vulkanDevice_->queueFamilyIndices.compute)
 		{
 			VkBufferMemoryBarrier buffer_barrier =
 			{
@@ -701,8 +701,8 @@ public:
 				nullptr,
 				VK_ACCESS_SHADER_WRITE_BIT,
 				0,
-				vulkanDevice->queueFamilyIndices.compute,
-				vulkanDevice->queueFamilyIndices.graphics,
+				vulkanDevice_->queueFamilyIndices.compute,
+				vulkanDevice_->queueFamilyIndices.graphics,
 				indirectCommandsBuffers[currentBuffer_].buffer,
 				0,
 				indirectCommandsBuffers[currentBuffer_].descriptor.range
@@ -750,8 +750,8 @@ public:
 
 		// Submit graphics commands
 		{
-			VK_CHECK_RESULT(vkWaitForFences(device_, 1, &waitFences[currentBuffer_], VK_TRUE, UINT64_MAX));
-			VK_CHECK_RESULT(vkResetFences(device_, 1, &waitFences[currentBuffer_]));
+			VK_CHECK_RESULT(vkWaitForFences(device_, 1, &waitFences_[currentBuffer_], VK_TRUE, UINT64_MAX));
+			VK_CHECK_RESULT(vkResetFences(device_, 1, &waitFences_[currentBuffer_]));
 		
 			VulkanExampleBase::prepareFrame(false);
 
@@ -759,8 +759,8 @@ public:
 			buildGraphicsCommandBuffer();
 
 			VkPipelineStageFlags waitDstStageMask[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT };
-			VkSemaphore waitSemaphores[2] = { presentCompleteSemaphores[currentBuffer_], compute.semaphores[currentBuffer_].complete };
-			VkSemaphore signalSemaphores[2] = { renderCompleteSemaphores[currentImageIndex_], compute.semaphores[currentBuffer_].ready };
+			VkSemaphore waitSemaphores[2] = { presentCompleteSemaphores_[currentBuffer_], compute.semaphores[currentBuffer_].complete };
+			VkSemaphore signalSemaphores[2] = { renderCompleteSemaphores_[currentImageIndex_], compute.semaphores[currentBuffer_].ready };
 
 			// Submit graphics commands
 			VkSubmitInfo submitInfo = vks::initializers::submitInfo();
@@ -768,10 +768,10 @@ public:
 			submitInfo.pWaitDstStageMask = waitDstStageMask;
 			submitInfo.pWaitSemaphores = waitSemaphores;
 			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer_];
+			submitInfo.pCommandBuffers = &drawCmdBuffers_[currentBuffer_];
 			submitInfo.signalSemaphoreCount = 2;
 			submitInfo.pSignalSemaphores = signalSemaphores;
-			VK_CHECK_RESULT(vkQueueSubmit(queue_, 1, &submitInfo, waitFences[currentBuffer_]));
+			VK_CHECK_RESULT(vkQueueSubmit(queue_, 1, &submitInfo, waitFences_[currentBuffer_]));
 
 			VulkanExampleBase::submitFrame(true);
 		}

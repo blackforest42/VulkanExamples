@@ -667,9 +667,9 @@ VulkanExample::~VulkanExample()
 void VulkanExample::getEnabledFeatures()
 {
 	// Fill mode non solid is required for wireframe display
-	if (deviceFeatures.fillModeNonSolid)
+	if (deviceFeatures_.fillModeNonSolid)
 	{
-		enabledFeatures.fillModeNonSolid = VK_TRUE;
+		enabledFeatures_.fillModeNonSolid = VK_TRUE;
 	};
 }
 
@@ -689,7 +689,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	bool fileLoaded = gltfContext.LoadASCIIFromFile(&glTFInput, &error, &warning, filename);
 
 	// Pass some Vulkan resources required for setup and rendering to the glTF model loading class
-	glTFModel.vulkanDevice = vulkanDevice;
+	glTFModel.vulkanDevice = vulkanDevice_;
 	glTFModel.copyQueue    = queue_;
 
 	std::vector<uint32_t>                indexBuffer;
@@ -728,14 +728,14 @@ void VulkanExample::loadglTFFile(std::string filename)
 	vks::Buffer vertexStaging, indexStaging;
 
 	// Create host visible staging buffers (source)
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 	    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 	    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	    &vertexStaging,
 	    vertexBufferSize,
 	    vertexBuffer.data()));
 	// Index data
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 	    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 	    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	    &indexStaging,
@@ -743,13 +743,13 @@ void VulkanExample::loadglTFFile(std::string filename)
 	    indexBuffer.data()));
 
 	// Create device local buffers (target)
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 	    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 	    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 	    vertexBufferSize,
 	    &glTFModel.vertices.buffer,
 	    &glTFModel.vertices.memory));
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 	    VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 	    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 	    indexBufferSize,
@@ -757,13 +757,13 @@ void VulkanExample::loadglTFFile(std::string filename)
 	    &glTFModel.indices.memory));
 
 	// Copy data from staging buffers (host) do device local buffer (gpu)
-	VkCommandBuffer copyCmd    = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	VkCommandBuffer copyCmd    = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	VkBufferCopy    copyRegion = {};
 	copyRegion.size            = vertexBufferSize;
 	vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, glTFModel.vertices.buffer, 1, &copyRegion);
 	copyRegion.size = indexBufferSize;
 	vkCmdCopyBuffer(copyCmd, indexStaging.buffer, glTFModel.indices.buffer, 1, &copyRegion);
-	vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+	vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 	vertexStaging.destroy();
 	indexStaging.destroy();
@@ -896,21 +896,21 @@ void VulkanExample::preparePipelines()
 	pipelineCI.pStages                      = shaderStages.data();
 
 	// Solid rendering pipeline
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.solid));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.solid));
 
 	// Wire frame rendering pipeline
-	if (deviceFeatures.fillModeNonSolid)
+	if (deviceFeatures_.fillModeNonSolid)
 	{
 		rasterizationStateCI.polygonMode = VK_POLYGON_MODE_LINE;
 		rasterizationStateCI.lineWidth   = 1.0f;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
 	}
 }
 
 void VulkanExample::prepareUniformBuffers()
 {
 	for (auto& buffer : uniformBuffers_) {
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 		VK_CHECK_RESULT(buffer.map());
 	}
 }
@@ -939,7 +939,7 @@ void VulkanExample::prepare()
 
 void VulkanExample::buildCommandBuffer()
 {
-	VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+	VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 	
 	VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

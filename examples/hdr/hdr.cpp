@@ -177,7 +177,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &attachment->image));
 		vkGetImageMemoryRequirements(device_, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &attachment->mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, attachment->image, attachment->mem, 0));
 
@@ -207,7 +207,7 @@ public:
 			createAttachment(VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &offscreen.color[0]);
 			createAttachment(VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &offscreen.color[1]);
 			// Depth attachment
-			createAttachment(depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &offscreen.depth);
+			createAttachment(depthFormat_, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &offscreen.depth);
 
 			// Set up separate renderpass with references to the color and depth attachments
 			std::array<VkAttachmentDescription, 3> attachmentDescs = {};
@@ -417,15 +417,15 @@ public:
 	{
 		// Load glTF models
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY;
-		models_.skybox.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.skybox.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 		std::vector<std::string> filenames = { "sphere.gltf", "teapot.gltf", "torusknot.gltf", "venus.gltf" };
 		modelNames = { "Sphere", "Teapot", "Torusknot", "Venus" };
 		models_.objects.resize(filenames.size());
 		for (size_t i = 0; i < filenames.size(); i++) {
-			models_.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i], vulkanDevice, queue_, glTFLoadingFlags);
+			models_.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i], vulkanDevice_, queue_, glTFLoadingFlags);
 		}
 		// Load HDR cube map
-		textures.envmap.loadFromFile(getAssetPath() + "textures/hdr/uffizi_cube.ktx", VK_FORMAT_R16G16B16A16_SFLOAT, vulkanDevice, queue_);
+		textures.envmap.loadFromFile(getAssetPath() + "textures/hdr/uffizi_cube.ktx", VK_FORMAT_R16G16B16A16_SFLOAT, vulkanDevice_, queue_);
 	}
 
 	void setupDescriptors()
@@ -568,7 +568,7 @@ public:
 		colorBlendState.pAttachments = blendAttachmentStates.data();
 		shaderStages[0] = loadShader(getShadersPath() + "hdr/composition.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "hdr/composition.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.composition));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.composition));
 
 		// Bloom pass
 		shaderStages[0] = loadShader(getShadersPath() + "hdr/bloom.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -588,12 +588,12 @@ public:
 		uint32_t dir = 1;
 		specializationInfo = vks::initializers::specializationInfo(1, specializationMapEntries.data(), sizeof(dir), &dir);
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.bloom[0]));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.bloom[0]));
 
 		// Second blur pass (into separate framebuffer)
 		pipelineCI.renderPass = filterPass.renderPass;
 		dir = 0;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.bloom[1]));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.bloom[1]));
 
 		// Object rendering pipelines
 		// Use vertex input state from glTF model setup
@@ -614,7 +614,7 @@ public:
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
 		// Skybox pipeline (background cube)
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skybox));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skybox));
 
 		// Object rendering pipeline
 		shadertype = 1;
@@ -623,7 +623,7 @@ public:
 		depthStencilState.depthTestEnable = VK_TRUE;
 		// Flip cull mode
 		rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.reflect));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.reflect));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -631,7 +631,7 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Scene matrices uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -657,7 +657,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

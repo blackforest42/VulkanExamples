@@ -47,7 +47,7 @@ public:
 		// in addition to the extension, the feature needs to be explicitly enabled by chaining the extension structure into device creation
 		enabledFragmentShaderBarycentricFeaturesKHR.fragmentShaderBarycentric = VK_TRUE;
 
-		deviceCreatepNextChain = &enabledFragmentShaderBarycentricFeaturesKHR;
+		deviceCreatepNextChain_ = &enabledFragmentShaderBarycentricFeaturesKHR;
 	}
 
 	~VulkanExample()
@@ -64,14 +64,14 @@ public:
 
 	virtual void getEnabledFeatures()
 	{
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		}
 	}
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY | vkglTF::FileLoadingFlags::PreMultiplyVertexColors);
+		model.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY | vkglTF::FileLoadingFlags::PreMultiplyVertexColors);
 	}
 
 	void setupDescriptors()
@@ -132,14 +132,14 @@ public:
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Color });
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -163,7 +163,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

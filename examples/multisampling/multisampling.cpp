@@ -88,12 +88,12 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable sample rate shading filtering if supported
-		if (deviceFeatures.sampleRateShading) {
-			enabledFeatures.sampleRateShading = VK_TRUE;
+		if (deviceFeatures_.sampleRateShading) {
+			enabledFeatures_.sampleRateShading = VK_TRUE;
 		}
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	}
 
@@ -102,7 +102,7 @@ public:
 	void setupMultisampleTarget()
 	{
 		// Check if device supports requested sample count for color and depth frame buffer
-		assert((deviceProperties.limits.framebufferColorSampleCounts & sampleCount) && (deviceProperties.limits.framebufferDepthSampleCounts & sampleCount));
+		assert((deviceProperties_.limits.framebufferColorSampleCounts & sampleCount) && (deviceProperties_.limits.framebufferDepthSampleCounts & sampleCount));
 
 		// Color target
 		VkImageCreateInfo info = vks::initializers::imageCreateInfo();
@@ -129,11 +129,11 @@ public:
 		// We prefer a lazily allocated memory type
 		// This means that the memory gets allocated when the implementation sees fit, e.g. when first using the images
 		VkBool32 lazyMemTypePresent;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
 		if (!lazyMemTypePresent)
 		{
 			// If this is not available, fall back to device local memory
-			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &multisampleTarget.color.memory));
 		vkBindImageMemory(device_, multisampleTarget.color.image, multisampleTarget.color.memory, 0);
@@ -155,7 +155,7 @@ public:
 
 		// Depth target
 		info.imageType = VK_IMAGE_TYPE_2D;
-		info.format = depthFormat;
+		info.format = depthFormat_;
 		info.extent.width = width_;
 		info.extent.height = height_;
 		info.extent.depth = 1;
@@ -174,10 +174,10 @@ public:
 		memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
 
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, &lazyMemTypePresent);
 		if (!lazyMemTypePresent)
 		{
-			memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		}
 
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &multisampleTarget.depth.memory));
@@ -186,13 +186,13 @@ public:
 		// Create image view for the MSAA target
 		viewInfo.image = multisampleTarget.depth.image;
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		viewInfo.format = depthFormat;
+		viewInfo.format = depthFormat_;
 		viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
 		viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
 		viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
 		viewInfo.components.a = VK_COMPONENT_SWIZZLE_A;
 		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT)
+		if (depthFormat_ >= VK_FORMAT_D16_UNORM_S8_UINT)
 			viewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		viewInfo.subresourceRange.levelCount = 1;
 		viewInfo.subresourceRange.layerCount = 1;
@@ -233,7 +233,7 @@ public:
 		attachments[1].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 		// Multisampled depth attachment we render to
-		attachments[2].format = depthFormat;
+		attachments[2].format = depthFormat_;
 		attachments[2].samples = sampleCount;
 		attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -343,7 +343,7 @@ public:
 
 	void loadAssets()
 	{
-		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void setupDescriptors()
@@ -417,9 +417,9 @@ public:
 		// MSAA rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "multisampling/mesh.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "multisampling/mesh.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.MSAA));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.MSAA));
 
-		if (vulkanDevice->features.sampleRateShading)
+		if (vulkanDevice_->features.sampleRateShading)
 		{
 			// MSAA with sample shading pipeline
 			// Sample shading enables per-sample shading to avoid shader aliasing and smooth out e.g. high frequency texture maps
@@ -429,7 +429,7 @@ public:
 			multisampleState.sampleShadingEnable = VK_TRUE;
 			// Minimum fraction for sample shading
 			multisampleState.minSampleShading = 0.25f;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.MSAASampleShading));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.MSAASampleShading));
 		}
 	}
 
@@ -437,7 +437,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -453,7 +453,7 @@ public:
 	// In a realworld application, this would be a user setting instead
 	VkSampleCountFlagBits getMaxAvailableSampleCount()
 	{
-		VkSampleCountFlags supportedSampleCount = std::min(deviceProperties.limits.framebufferColorSampleCounts, deviceProperties.limits.framebufferDepthSampleCounts);
+		VkSampleCountFlags supportedSampleCount = std::min(deviceProperties_.limits.framebufferColorSampleCounts, deviceProperties_.limits.framebufferDepthSampleCounts);
 		std::vector< VkSampleCountFlagBits> possibleSampleCounts {
 			VK_SAMPLE_COUNT_64_BIT, VK_SAMPLE_COUNT_32_BIT, VK_SAMPLE_COUNT_16_BIT, VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_2_BIT
 		};
@@ -468,7 +468,7 @@ public:
 	void prepare()
 	{
 		sampleCount = getMaxAvailableSampleCount();
-		ui.rasterizationSamples = sampleCount;
+		ui_.rasterizationSamples = sampleCount;
 		VulkanExampleBase::prepare();
 		loadAssets();
 		prepareUniformBuffers();
@@ -479,7 +479,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -531,7 +531,7 @@ public:
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)
 	{
-		if (vulkanDevice->features.sampleRateShading) {
+		if (vulkanDevice_->features.sampleRateShading) {
 			if (overlay->header("Settings")) {
 				overlay->checkBox("Sample rate shading", &useSampleShading);
 			}

@@ -59,13 +59,13 @@ public:
 
 	ImGUI(VulkanExampleBase *example) : example(example)
 	{
-		device = example->vulkanDevice;
+		device = example->vulkanDevice_;
 		ImGui::CreateContext();
 		// Set ImGui font and style scale factors to handle retina and other HiDPI displays
 		ImGuiIO& io = ImGui::GetIO();
-		io.FontGlobalScale = example->ui.scale;
+		io.FontGlobalScale = example->ui_.scale;
 		ImGuiStyle& style = ImGui::GetStyle();
-		style.ScaleAllSizes(example->ui.scale);
+		style.ScaleAllSizes(example->ui_.scale);
 	};
 
 	~ImGUI()
@@ -344,7 +344,7 @@ public:
 	// Starts a new imGui frame and sets up windows and ui elements
 	void newFrame(VulkanExampleBase *example, bool updateFpsPlot)
 	{
-		const float uiScale = example->ui.scale;
+		const float uiScale = example->ui_.scale;
 
 		// Being an intermediate mode UI, we generate a new UI frame on each draw
 		ImGui::NewFrame();
@@ -528,7 +528,7 @@ public:
 		camera_.setRotation(glm::vec3(4.5f, -380.0f, 0.0f));
 		camera_.setPerspective(45.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
 		// Don't use the ImGui overlay of the base framework in this sample
-		settings.overlay = false;
+		settings_.overlay = false;
 	}
 
 	~VulkanExample()
@@ -604,14 +604,14 @@ public:
 
 		shaderStages[0] = loadShader(getShadersPath() + "imgui/scene.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "imgui/scene.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -633,9 +633,9 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.models.loadFromFile(getAssetPath() + "models/vulkanscenemodels.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.background.loadFromFile(getAssetPath() + "models/vulkanscenebackground.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.logos.loadFromFile(getAssetPath() + "models/vulkanscenelogos.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.models.loadFromFile(getAssetPath() + "models/vulkanscenemodels.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.background.loadFromFile(getAssetPath() + "models/vulkanscenebackground.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.logos.loadFromFile(getAssetPath() + "models/vulkanscenelogos.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void prepareImGui()
@@ -644,7 +644,7 @@ public:
 		imGui->init((float)width_, (float)height_);
 		imGui->initResources(renderPass_, queue_, getShadersPath());
 		imGui->sampleName = title;
-		imGui->deviceName = deviceProperties.deviceName;
+		imGui->deviceName = deviceProperties_.deviceName;
 	}
 
 	void prepare()
@@ -660,7 +660,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -679,7 +679,7 @@ public:
 		renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
 
 		// Update fps plot once a second
-		bool updateFpsPlot = (frameCounter == 0);
+		bool updateFpsPlot = (frameCounter_ == 0);
 		imGui->newFrame(this, updateFpsPlot);
 		imGui->updateBuffers(currentBuffer_);
 
@@ -711,7 +711,7 @@ public:
 		}
 
 		// Render imGui
-		if (ui.visible) {
+		if (ui_.visible) {
 			imGui->drawFrame(cmdBuffer, currentBuffer_);
 		}
 
@@ -730,9 +730,9 @@ public:
 		io.DisplaySize = ImVec2((float)width_, (float)height_);
 		io.DeltaTime = frameTimer;
 		io.MousePos = ImVec2(mouseState.position.x, mouseState.position.y);
-		io.MouseDown[0] = mouseState.buttons.left && ui.visible;
-		io.MouseDown[1] = mouseState.buttons.right && ui.visible;
-		io.MouseDown[2] = mouseState.buttons.middle && ui.visible;
+		io.MouseDown[0] = mouseState.buttons.left && ui_.visible;
+		io.MouseDown[1] = mouseState.buttons.right && ui_.visible;
+		io.MouseDown[2] = mouseState.buttons.middle && ui_.visible;
 		// Pass values to be displayed in imGui
 		imGui->lastFps = static_cast<float>(lastFPS);
 
@@ -745,7 +745,7 @@ public:
 	virtual void mouseMoved(double x, double y, bool &handled)
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		handled = io.WantCaptureMouse && ui.visible;
+		handled = io.WantCaptureMouse && ui_.visible;
 	}
 
 // Input handling is platform specific, to show how it's basically done this sample implements it for Windows

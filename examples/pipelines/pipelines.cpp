@@ -47,7 +47,7 @@ public:
 	{
 		if (device_) {
 			vkDestroyPipeline(device_, pipelines_.phong, nullptr);
-			if (enabledFeatures.fillModeNonSolid) {
+			if (enabledFeatures_.fillModeNonSolid) {
 				vkDestroyPipeline(device_, pipelines_.wireframe, nullptr);
 			}
 			vkDestroyPipeline(device_, pipelines_.toon, nullptr);
@@ -63,20 +63,20 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		};
 
 		// Wide lines must be present for line width > 1.0f
-		if (deviceFeatures.wideLines) {
-			enabledFeatures.wideLines = VK_TRUE;
+		if (deviceFeatures_.wideLines) {
+			enabledFeatures_.wideLines = VK_TRUE;
 		}
 	}
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/treasure_smooth.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -152,7 +152,7 @@ public:
 		// Phong shading pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "pipelines/phong.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pipelines/phong.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.phong));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.phong));
 
 		// All pipelines created after the base pipeline will be derivatives
 		pipelineCI.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
@@ -165,15 +165,15 @@ public:
 		// Toon shading pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "pipelines/toon.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "pipelines/toon.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.toon));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.toon));
 
 		// Pipeline for wire frame rendering
 		// Non solid rendering is not a mandatory Vulkan feature
-		if (enabledFeatures.fillModeNonSolid) {
+		if (enabledFeatures_.fillModeNonSolid) {
 			rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
 			shaderStages[0] = loadShader(getShadersPath() + "pipelines/wireframe.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 			shaderStages[1] = loadShader(getShadersPath() + "pipelines/wireframe.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
 		}
 	}
 
@@ -181,7 +181,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -207,7 +207,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -250,13 +250,13 @@ public:
 		vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 		vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_.toon);
 		// Line width > 1.0f only if wide lines feature is supported
-		if (enabledFeatures.wideLines) {
+		if (enabledFeatures_.wideLines) {
 			vkCmdSetLineWidth(cmdBuffer, 2.0f);
 		}
 		scene.draw(cmdBuffer);
 
 		// Right : Render the scene as wireframe (if that feature is supported by the implementation)
-		if (enabledFeatures.fillModeNonSolid) {
+		if (enabledFeatures_.fillModeNonSolid) {
 			viewport.x = (float)width_ / 3.0f + (float)width_ / 3.0f;
 			vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 			vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines_.wireframe);
@@ -282,7 +282,7 @@ public:
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)
 	{
-		if (!enabledFeatures.fillModeNonSolid) {
+		if (!enabledFeatures_.fillModeNonSolid) {
 			if (overlay->header("Info")) {
 				overlay->text("Non solid fill modes not supported!");
 			}

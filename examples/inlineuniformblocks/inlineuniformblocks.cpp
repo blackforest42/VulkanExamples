@@ -89,7 +89,7 @@ class VulkanExample : public VulkanExampleBase {
     enabledInlineUniformBlockFeatures.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
     enabledInlineUniformBlockFeatures.inlineUniformBlock = VK_TRUE;
-    deviceCreatepNextChain = &enabledInlineUniformBlockFeatures;
+    deviceCreatepNextChain_ = &enabledInlineUniformBlockFeatures;
   }
 
   ~VulkanExample() {
@@ -107,7 +107,7 @@ class VulkanExample : public VulkanExampleBase {
   }
 
   void loadAssets() {
-    model.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice,
+    model.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice_,
                        queue_);
 
     // Setup random materials for every object in the scene
@@ -302,13 +302,13 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] =
         loadShader(getShadersPath() + "inlineuniformblocks/pbr.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1,
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr, &pipeline));
   }
 
   void prepareUniformBuffers() {
     for (auto& buffer : uniformBuffers_) {
-      VK_CHECK_RESULT(vulkanDevice->createBuffer(
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -372,7 +372,7 @@ class VulkanExample : public VulkanExampleBase {
   }
 
   void buildCommandBuffer() {
-    VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+    VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();

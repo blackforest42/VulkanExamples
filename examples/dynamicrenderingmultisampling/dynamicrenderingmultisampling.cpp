@@ -48,7 +48,7 @@ public:
 		camera_.setPosition(glm::vec3(0.0f, 0.0f, -10.0f));
 		camera_.setRotation(glm::vec3(-7.5f, 72.0f, 0.0f));
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
-		settings.overlay = false;
+		settings_.overlay = false;
 
 		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
@@ -63,7 +63,7 @@ public:
 		enabledDynamicRenderingFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
 		enabledDynamicRenderingFeaturesKHR.dynamicRendering = VK_TRUE;
 
-		deviceCreatepNextChain = &enabledDynamicRenderingFeaturesKHR;
+		deviceCreatepNextChain_ = &enabledDynamicRenderingFeaturesKHR;
 	}
 
 	~VulkanExample() override
@@ -110,7 +110,7 @@ public:
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
-		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllloc, nullptr, &renderImage.memory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, renderImage.image, renderImage.memory, 0));
 		VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
@@ -127,52 +127,52 @@ public:
 		VkImageCreateInfo imageCI{};
 		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.format = depthFormat;
+		imageCI.format = depthFormat_;
 		imageCI.extent = { width_, height_, 1 };
 		imageCI.mipLevels = 1;
 		imageCI.arrayLayers = 1;
 		imageCI.samples = multiSampleCount;
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		VK_CHECK_RESULT(vkCreateImage(device_, &imageCI, nullptr, &depthStencil.image));
+		VK_CHECK_RESULT(vkCreateImage(device_, &imageCI, nullptr, &depthStencil_.image));
 		VkMemoryRequirements memReqs{};
-		vkGetImageMemoryRequirements(device_, depthStencil.image, &memReqs);
+		vkGetImageMemoryRequirements(device_, depthStencil_.image, &memReqs);
 		VkMemoryAllocateInfo memAllloc{};
 		memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memAllloc.allocationSize = memReqs.size;
-		memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllloc, nullptr, &depthStencil.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(device_, depthStencil.image, depthStencil.memory, 0));
+		memAllloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllloc, nullptr, &depthStencil_.memory));
+		VK_CHECK_RESULT(vkBindImageMemory(device_, depthStencil_.image, depthStencil_.memory, 0));
 		VkImageViewCreateInfo depthImageViewCI{};
 		depthImageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		depthImageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		depthImageViewCI.image = depthStencil.image;
-		depthImageViewCI.format = depthFormat;
+		depthImageViewCI.image = depthStencil_.image;
+		depthImageViewCI.format = depthFormat_;
 		depthImageViewCI.subresourceRange.baseMipLevel = 0;
 		depthImageViewCI.subresourceRange.levelCount = 1;
 		depthImageViewCI.subresourceRange.baseArrayLayer = 0;
 		depthImageViewCI.subresourceRange.layerCount = 1;
 		depthImageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		// Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+		if (depthFormat_ >= VK_FORMAT_D16_UNORM_S8_UINT) {
 			depthImageViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
-		VK_CHECK_RESULT(vkCreateImageView(device_, &depthImageViewCI, nullptr, &depthStencil.view));
+		VK_CHECK_RESULT(vkCreateImageView(device_, &depthImageViewCI, nullptr, &depthStencil_.view));
 	}
 
 	// Enable physical device features required for this example
 	void getEnabledFeatures() override
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		};
 	}
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		model.loadFromFile(getAssetPath() + "models/voyager.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -243,21 +243,21 @@ public:
 		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
 		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain_.colorFormat;
-		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat;
-		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat;
+		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat_;
+		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat_;
 		// Chain into the pipeline creat einfo
 		pipelineCI.pNext = &pipelineRenderingCreateInfo;
 
 		shaderStages[0] = loadShader(getShadersPath() + "dynamicrendering/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "dynamicrendering/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -287,7 +287,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
@@ -306,7 +306,7 @@ public:
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 		vks::tools::insertImageMemoryBarrier(
 			cmdBuffer,
-			depthStencil.image,
+			depthStencil_.image,
 			0,
 			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 			VK_IMAGE_LAYOUT_UNDEFINED,
@@ -343,7 +343,7 @@ public:
 		// When both are specified separately, the only requirement is that the image view is identical.			
 		VkRenderingAttachmentInfoKHR depthStencilAttachment{};
 		depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-		depthStencilAttachment.imageView = depthStencil.view;
+		depthStencilAttachment.imageView = depthStencil_.view;
 		depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;

@@ -85,7 +85,7 @@ class VulkanExample : public VulkanRaytracingSample {
         vkglTF::FileLoadingFlags::PreMultiplyVertexColors |
         vkglTF::FileLoadingFlags::FlipY;
     scene.loadFromFile(getAssetPath() + "models/vulkanscene_shadow.gltf",
-                       vulkanDevice, queue_, glTFLoadingFlags);
+                       vulkanDevice_, queue_, glTFLoadingFlags);
 
     VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
     VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
@@ -180,12 +180,12 @@ class VulkanExample : public VulkanRaytracingSample {
     // building on the host
     // (VkPhysicalDeviceAccelerationStructureFeaturesKHR->accelerationStructureHostCommands),
     // but we prefer device builds
-    VkCommandBuffer commandBuffer = vulkanDevice->createCommandBuffer(
+    VkCommandBuffer commandBuffer = vulkanDevice_->createCommandBuffer(
         VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
     vkCmdBuildAccelerationStructuresKHR(
         commandBuffer, 1, &accelerationBuildGeometryInfo,
         accelerationBuildStructureRangeInfos.data());
-    vulkanDevice->flushCommandBuffer(commandBuffer, queue_);
+    vulkanDevice_->flushCommandBuffer(commandBuffer, queue_);
 
     deleteScratchBuffer(scratchBuffer);
   }
@@ -208,7 +208,7 @@ class VulkanExample : public VulkanRaytracingSample {
 
     // Buffer for instance data
     vks::Buffer instancesBuffer;
-    VK_CHECK_RESULT(vulkanDevice->createBuffer(
+    VK_CHECK_RESULT(vulkanDevice_->createBuffer(
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -290,12 +290,12 @@ class VulkanExample : public VulkanRaytracingSample {
     // building on the host
     // (VkPhysicalDeviceAccelerationStructureFeaturesKHR->accelerationStructureHostCommands),
     // but we prefer device builds
-    VkCommandBuffer commandBuffer = vulkanDevice->createCommandBuffer(
+    VkCommandBuffer commandBuffer = vulkanDevice_->createCommandBuffer(
         VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
     vkCmdBuildAccelerationStructuresKHR(
         commandBuffer, 1, &accelerationBuildGeometryInfo,
         accelerationBuildStructureRangeInfos.data());
-    vulkanDevice->flushCommandBuffer(commandBuffer, queue_);
+    vulkanDevice_->flushCommandBuffer(commandBuffer, queue_);
 
     deleteScratchBuffer(scratchBuffer);
     instancesBuffer.destroy();
@@ -553,7 +553,7 @@ class VulkanExample : public VulkanRaytracingSample {
   */
   void createUniformBuffer() {
     for (auto& buffer : uniformBuffers_) {
-      VK_CHECK_RESULT(vulkanDevice->createBuffer(
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -579,7 +579,7 @@ class VulkanExample : public VulkanRaytracingSample {
               &storageImageDescriptor);
       vkUpdateDescriptorSets(device_, 1, &resultImageWrite, 0, VK_NULL_HANDLE);
     }
-    resized = false;
+    resized_ = false;
   }
 
   void updateUniformBuffers() {
@@ -613,7 +613,7 @@ class VulkanExample : public VulkanRaytracingSample {
     enabledAccelerationStructureFeatures.pNext =
         &enabledRayTracingPipelineFeatures;
 
-    deviceCreatepNextChain = &enabledAccelerationStructureFeatures;
+    deviceCreatepNextChain_ = &enabledAccelerationStructureFeatures;
   }
 
   void prepare() {
@@ -632,11 +632,11 @@ class VulkanExample : public VulkanRaytracingSample {
   }
 
   void buildCommandBuffer() {
-    if (resized) {
+    if (resized_) {
       handleResize();
     }
 
-    VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+    VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();

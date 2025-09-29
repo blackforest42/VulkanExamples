@@ -141,8 +141,8 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		};
 	}
 
@@ -218,7 +218,7 @@ public:
 		for (auto& buffer : particleBuffers) {
 			buffer.size = particles.size() * sizeof(Particle);
 
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				buffer.size,
@@ -266,12 +266,12 @@ public:
 	void loadAssets()
 	{
 		// Particles
-		textures.particles.smoke.loadFromFile(getAssetPath() + "textures/particle_smoke.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.particles.fire.loadFromFile(getAssetPath() + "textures/particle_fire.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.particles.smoke.loadFromFile(getAssetPath() + "textures/particle_smoke.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.particles.fire.loadFromFile(getAssetPath() + "textures/particle_fire.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 
 		// Floor
-		textures.floor.colorMap.loadFromFile(getAssetPath() + "textures/fireplace_colormap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.floor.normalMap.loadFromFile(getAssetPath() + "textures/fireplace_normalmap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.floor.colorMap.loadFromFile(getAssetPath() + "textures/fireplace_colormap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.floor.normalMap.loadFromFile(getAssetPath() + "textures/fireplace_normalmap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 
 		// Create a custom sampler to be used with the particle textures
 		// Create sampler
@@ -289,7 +289,7 @@ public:
 		// Both particle textures have the same number of mip maps
 		samplerCreateInfo.maxLod = float(textures.particles.fire.mipLevels);
 
-		if (vulkanDevice->features.samplerAnisotropy)
+		if (vulkanDevice_->features.samplerAnisotropy)
 		{
 			// Enable anisotropic filtering
 			samplerCreateInfo.maxAnisotropy = 8.0f;
@@ -301,7 +301,7 @@ public:
 		VK_CHECK_RESULT(vkCreateSampler(device_, &samplerCreateInfo, nullptr, &textures.particles.sampler));
 
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		environment.loadFromFile(getAssetPath() + "models/fireplace.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		environment.loadFromFile(getAssetPath() + "models/fireplace.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -426,7 +426,7 @@ public:
 
 			shaderStages[0] = loadShader(getShadersPath() + "particlesystem/particle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 			shaderStages[1] = loadShader(getShadersPath() + "particlesystem/particle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.particles));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.particles));
 		}
 
 		// Environment rendering pipeline (normal mapped)
@@ -440,7 +440,7 @@ public:
 
 			shaderStages[0] = loadShader(getShadersPath() + "particlesystem/normalmap.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 			shaderStages[1] = loadShader(getShadersPath() + "particlesystem/normalmap.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.environment));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.environment));
 		}
 	}
 
@@ -448,8 +448,8 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.particles, sizeof(UniformDataParticles)));
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.environment, sizeof(UniformDataEnvironment)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.particles, sizeof(UniformDataParticles)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.environment, sizeof(UniformDataEnvironment)));
 			VK_CHECK_RESULT(buffer.particles.map());
 			VK_CHECK_RESULT(buffer.environment.map());
 		}
@@ -504,7 +504,7 @@ public:
 		renderPassBeginInfo.clearValueCount = 2;
 		renderPassBeginInfo.pClearValues = clearValues;
 
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		// Set target frame buffer
 		renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];

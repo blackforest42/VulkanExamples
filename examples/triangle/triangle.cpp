@@ -117,7 +117,7 @@ public:
 	{
 		title = "Basic indexed triangle";
 		// To keep things simple, we don't use the UI overlay from the framework
-		settings.overlay = false;
+		settings_.overlay = false;
 		// Setup a default look-at camera
 		camera_.type = Camera::CameraType::lookat;
 		camera_.setPosition(glm::vec3(0.0f, 0.0f, -2.5f));
@@ -463,7 +463,7 @@ public:
 		VkImageCreateInfo imageCI{};
 		imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCI.imageType = VK_IMAGE_TYPE_2D;
-		imageCI.format = depthFormat;
+		imageCI.format = depthFormat_;
 		// Use example's height and width
 		imageCI.extent = { width_, height_, 1 };
 		imageCI.mipLevels = 1;
@@ -472,17 +472,17 @@ public:
 		imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_CHECK_RESULT(vkCreateImage(device_, &imageCI, nullptr, &depthStencil.image));
+		VK_CHECK_RESULT(vkCreateImage(device_, &imageCI, nullptr, &depthStencil_.image));
 
 		// Allocate memory for the image (device local) and bind it to our image
 		VkMemoryAllocateInfo memAlloc{};
 		memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		VkMemoryRequirements memReqs;
-		vkGetImageMemoryRequirements(device_, depthStencil.image, &memReqs);
+		vkGetImageMemoryRequirements(device_, depthStencil_.image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
 		memAlloc.memoryTypeIndex = getMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &depthStencil.memory));
-		VK_CHECK_RESULT(vkBindImageMemory(device_, depthStencil.image, depthStencil.memory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &depthStencil_.memory));
+		VK_CHECK_RESULT(vkBindImageMemory(device_, depthStencil_.image, depthStencil_.memory, 0));
 
 		// Create a view for the depth stencil image
 		// Images aren't directly accessed in Vulkan, but rather through views described by a subresource range
@@ -490,19 +490,19 @@ public:
 		VkImageViewCreateInfo depthStencilViewCI{};
 		depthStencilViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		depthStencilViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		depthStencilViewCI.format = depthFormat;
+		depthStencilViewCI.format = depthFormat_;
 		depthStencilViewCI.subresourceRange = {};
 		depthStencilViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		// Stencil aspect should only be set on depth + stencil formats (VK_FORMAT_D16_UNORM_S8_UINT..VK_FORMAT_D32_SFLOAT_S8_UINT)
-		if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+		if (depthFormat_ >= VK_FORMAT_D16_UNORM_S8_UINT) {
 			depthStencilViewCI.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
 		depthStencilViewCI.subresourceRange.baseMipLevel = 0;
 		depthStencilViewCI.subresourceRange.levelCount = 1;
 		depthStencilViewCI.subresourceRange.baseArrayLayer = 0;
 		depthStencilViewCI.subresourceRange.layerCount = 1;
-		depthStencilViewCI.image = depthStencil.image;
-		VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilViewCI, nullptr, &depthStencil.view));
+		depthStencilViewCI.image = depthStencil_.image;
+		VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilViewCI, nullptr, &depthStencil_.view));
 	}
 
 	// Create a frame buffer for each swap chain image
@@ -517,7 +517,7 @@ public:
 			// Color attachment is the view of the swapchain image
 			attachments[0] = swapChain_.imageViews[i];
 			// Depth/Stencil attachment is the same for all frame buffers due to how depth works with current GPUs
-			attachments[1] = depthStencil.view;         
+			attachments[1] = depthStencil_.view;         
 
 			VkFramebufferCreateInfo frameBufferCI{};
 			frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -556,7 +556,7 @@ public:
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;                   // Layout to which the attachment is transitioned when the render pass is finished
 		                                                                                // As we want to present the color buffer to the swapchain, we transition to PRESENT_KHR
 		// Depth attachment
-		attachments[1].format = depthFormat;                                           // A proper depth format is selected in the example base
+		attachments[1].format = depthFormat_;                                           // A proper depth format is selected in the example base
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;                           // Clear depth at start of first subpass
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;                     // We don't need depth after render pass has finished (DONT_CARE may result in better performance)
@@ -844,7 +844,7 @@ public:
 		pipelineCI.pDynamicState = &dynamicStateCI;
 
 		// Create rendering pipeline using the specified states
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 
 		// Shader modules are no longer needed once the graphics pipeline has been created
 		vkDestroyShaderModule(device_, shaderStages[0].module, nullptr);

@@ -308,7 +308,7 @@ VulkanExample::~VulkanExample()
 
 void VulkanExample::getEnabledFeatures()
 {
-	enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+	enabledFeatures_.samplerAnisotropy = deviceFeatures_.samplerAnisotropy;
 }
 
 void VulkanExample::loadglTFFile(std::string filename)
@@ -327,7 +327,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 	bool fileLoaded = gltfContext.LoadASCIIFromFile(&glTFInput, &error, &warning, filename);
 
 	// Pass some Vulkan resources required for setup and rendering to the glTF model loading class
-	glTFScene.vulkanDevice = vulkanDevice;
+	glTFScene.vulkanDevice = vulkanDevice_;
 	glTFScene.copyQueue    = queue_;
 
 	size_t pos = filename.find_last_of('/');
@@ -362,14 +362,14 @@ void VulkanExample::loadglTFFile(std::string filename)
 	vks::Buffer vertexStaging, indexStaging;
 
 	// Create host visible staging buffers (source)
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&vertexStaging,
 		vertexBufferSize,
 		vertexBuffer.data()));
 	// Index data
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&indexStaging,
@@ -377,13 +377,13 @@ void VulkanExample::loadglTFFile(std::string filename)
 		indexBuffer.data()));
 
 	// Create device local buffers (target)
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		vertexBufferSize,
 		&glTFScene.vertices.buffer,
 		&glTFScene.vertices.memory));
-	VK_CHECK_RESULT(vulkanDevice->createBuffer(
+	VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		indexBufferSize,
@@ -391,7 +391,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 		&glTFScene.indices.memory));
 
 	// Copy data from staging buffers (host) do device local buffer (gpu)
-	VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	VkBufferCopy copyRegion = {};
 
 	copyRegion.size = vertexBufferSize;
@@ -410,7 +410,7 @@ void VulkanExample::loadglTFFile(std::string filename)
 		1,
 		&copyRegion);
 
-	vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+	vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 	vertexStaging.destroy();
 	indexStaging.destroy();
@@ -553,14 +553,14 @@ void VulkanExample::preparePipelines()
 		// For double sided materials, culling will be disabled
 		rasterizationStateCI.cullMode = material.doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &material.pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &material.pipeline));
 	}
 }
 
 void VulkanExample::prepareUniformBuffers()
 {
 	for (auto& buffer : uniformBuffers_) {
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 		VK_CHECK_RESULT(buffer.map());
 	}
 }
@@ -585,7 +585,7 @@ void VulkanExample::prepare()
 
 void VulkanExample::buildCommandBuffer()
 {
-	VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+	VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 	
 	VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

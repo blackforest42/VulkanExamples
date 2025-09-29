@@ -120,13 +120,13 @@ class VulkanExample : public VulkanExampleBase {
         vkglTF::FileLoadingFlags::PreMultiplyVertexColors |
         vkglTF::FileLoadingFlags::FlipY;
     models_.ufo.loadFromFile(getAssetPath() + "models/retroufo.gltf",
-                             vulkanDevice, queue_, glTFLoadingFlags);
+                             vulkanDevice_, queue_, glTFLoadingFlags);
     models_.ufoGlow.loadFromFile(getAssetPath() + "models/retroufo_glow.gltf",
-                                 vulkanDevice, queue_, glTFLoadingFlags);
+                                 vulkanDevice_, queue_, glTFLoadingFlags);
     models_.skyBox.loadFromFile(getAssetPath() + "models/cube.gltf",
-                                vulkanDevice, queue_, glTFLoadingFlags);
+                                vulkanDevice_, queue_, glTFLoadingFlags);
     cubemap_.loadFromFile(getAssetPath() + "textures/cubemap_space.ktx",
-                          VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+                          VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
   }
 
   // (A.2) Prepare and initialize uniform buffer containing shader uniforms
@@ -134,14 +134,14 @@ class VulkanExample : public VulkanExampleBase {
     for (auto& buffer : uniformBuffers_) {
       // Phong and color pass vertex shader uniform buffer
       VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     &buffer.scene, sizeof(ubos_.scene)));
+          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                      &buffer.scene, sizeof(ubos_.scene)));
       VK_CHECK_RESULT(buffer.scene.map());
 
       // Blur parameters uniform buffers
-      VK_CHECK_RESULT(vulkanDevice->createBuffer(
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -150,10 +150,10 @@ class VulkanExample : public VulkanExampleBase {
 
       // Skybox
       VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     &buffer.skyBox, sizeof(ubos_.skyBox)));
+          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                      &buffer.skyBox, sizeof(ubos_.skyBox)));
       VK_CHECK_RESULT(buffer.skyBox.map());
     }
   }
@@ -167,7 +167,7 @@ class VulkanExample : public VulkanExampleBase {
     // Find a suitable depth format
     VkFormat fbDepthFormat;
     VkBool32 validDepthFormat =
-        vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+        vks::tools::getSupportedDepthFormat(physicalDevice_, &fbDepthFormat);
     assert(validDepthFormat);
 
     // Create a separate render pass for the offscreen rendering as it may
@@ -315,7 +315,7 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateImage(device_, &image, nullptr, &frameBuf->color.image));
     vkGetImageMemoryRequirements(device_, frameBuf->color.image, &memReqs);
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
+    memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(
         memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VK_CHECK_RESULT(
         vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->color.mem));
@@ -350,7 +350,7 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateImage(device_, &image, nullptr, &frameBuf->depth.image));
     vkGetImageMemoryRequirements(device_, frameBuf->depth.image, &memReqs);
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
+    memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(
         memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VK_CHECK_RESULT(
         vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->depth.mem));
@@ -594,13 +594,15 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1].pSpecializationInfo = &specializationInfo;
     // Vertical blur pipeline
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.blurVert));
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.blurVert));
     // Horizontal blur pipeline
     blurdirection = 1;
     pipelineCI.renderPass = renderPass_;
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.blurHorz));
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.blurHorz));
 
     // Phong pass (3D model)
     pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
@@ -615,7 +617,7 @@ class VulkanExample : public VulkanExampleBase {
     depthStencilStateCI.depthWriteEnable = VK_TRUE;
     rasterizationStateCI.cullMode = VK_CULL_MODE_BACK_BIT;
     pipelineCI.renderPass = renderPass_;
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1,
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.phongPass));
 
@@ -625,8 +627,9 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] = loadShader(getShadersPath() + "bloom/colorpass.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.glowPass));
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.glowPass));
 
     // Skybox (cubemap)
     shaderStages[0] = loadShader(getShadersPath() + "bloom/skybox.vert.spv",
@@ -637,7 +640,7 @@ class VulkanExample : public VulkanExampleBase {
     rasterizationStateCI.cullMode = VK_CULL_MODE_FRONT_BIT;
     pipelineCI.renderPass = renderPass_;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skyBox));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skyBox));
   }
 
   // (Part B) Called in VulkanExampleBase::renderLoop()
@@ -686,7 +689,7 @@ class VulkanExample : public VulkanExampleBase {
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();
 
-    VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+    VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 
     /*
             The blur method used in this example is multi pass and renders the

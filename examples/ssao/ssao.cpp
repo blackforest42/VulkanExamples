@@ -165,7 +165,7 @@ public:
 
 	void getEnabledFeatures()
 	{
-		enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+		enabledFeatures_.samplerAnisotropy = deviceFeatures_.samplerAnisotropy;
 	}
 
 	// Create a frame buffer attachment
@@ -211,7 +211,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &attachment->image));
 		vkGetImageMemoryRequirements(device_, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &attachment->mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, attachment->image, attachment->mem, 0));
 
@@ -245,7 +245,7 @@ public:
 
 		// Find a suitable depth format
 		VkFormat attDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &attDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice_, &attDepthFormat);
 		assert(validDepthFormat);
 
 		// G-Buffer
@@ -485,7 +485,7 @@ public:
 	{
 		vkglTF::descriptorBindingFlags  = vkglTF::DescriptorBindingFlags::ImageBaseColor;
 		const uint32_t gltfLoadingFlags = vkglTF::FileLoadingFlags::FlipY | vkglTF::FileLoadingFlags::PreTransformVertices;
-		scene.loadFromFile(getAssetPath() + "models/sponza/sponza.gltf", vulkanDevice, queue_, gltfLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/sponza/sponza.gltf", vulkanDevice_, queue_, gltfLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -646,7 +646,7 @@ public:
 		// Final composition pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "ssao/fullscreen.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "ssao/composition.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.composition));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.composition));
 
 		// SSAO generation pipeline
 		pipelineCreateInfo.renderPass = frameBuffers.ssao.renderPass;
@@ -663,13 +663,13 @@ public:
 		VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(2, specializationMapEntries.data(), sizeof(specializationData), &specializationData);
 		shaderStages[1] = loadShader(getShadersPath() + "ssao/ssao.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.ssao));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.ssao));
 
 		// SSAO blur pipeline
 		pipelineCreateInfo.renderPass = frameBuffers.ssaoBlur.renderPass;
 		pipelineCreateInfo.layout = pipelineLayouts_.ssaoBlur;
 		shaderStages[1] = loadShader(getShadersPath() + "ssao/blur.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.ssaoBlur));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.ssaoBlur));
 
 		// Fill G-Buffer pipeline
 		// Vertex input state from glTF model loader
@@ -689,7 +689,7 @@ public:
 		rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 		shaderStages[0] = loadShader(getShadersPath() + "ssao/gbuffer.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "ssao/gbuffer.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines_.offscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipelines_.offscreen));
 	}
 
 	float lerp(float a, float b, float f)
@@ -715,13 +715,13 @@ public:
 
 		for (auto& buffer : uniformBuffers_) {
 			// Scene matrices
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.sceneParams, sizeof(uboSceneParams));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.sceneParams, sizeof(uboSceneParams));
 			VK_CHECK_RESULT(buffer.sceneParams.map());
 			// SSAO parameters
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.ssaoParams, sizeof(uboSSAOParams));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.ssaoParams, sizeof(uboSSAOParams));
 			VK_CHECK_RESULT(buffer.ssaoParams.map());
 			// SSAO kernel
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.ssaoKernel, ssaoKernel.size() * sizeof(glm::vec4), ssaoKernel.data());
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.ssaoKernel, ssaoKernel.size() * sizeof(glm::vec4), ssaoKernel.data());
 		}
 
 		// Random noise for smoothing SSAO is uploaded as a texture
@@ -729,7 +729,7 @@ public:
 		for (uint32_t i = 0; i < static_cast<uint32_t>(noiseValues.size()); i++) {
 			noiseValues[i] = glm::vec4(rndDist(rndEngine) * 2.0f - 1.0f, rndDist(rndEngine) * 2.0f - 1.0f, 0.0f, 0.0f);
 		}
-		ssaoNoise.fromBuffer(noiseValues.data(), noiseValues.size() * sizeof(glm::vec4), VK_FORMAT_R32G32B32A32_SFLOAT, SSAO_NOISE_DIM, SSAO_NOISE_DIM, vulkanDevice, queue_, VK_FILTER_NEAREST);
+		ssaoNoise.fromBuffer(noiseValues.data(), noiseValues.size() * sizeof(glm::vec4), VK_FORMAT_R32G32B32A32_SFLOAT, SSAO_NOISE_DIM, SSAO_NOISE_DIM, vulkanDevice_, queue_, VK_FILTER_NEAREST);
 	}
 
 	void updateUniformBuffers()
@@ -758,7 +758,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

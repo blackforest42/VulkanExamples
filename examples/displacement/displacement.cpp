@@ -70,15 +70,15 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Tessellation shader support is required for this example
-		if (deviceFeatures.tessellationShader) {
-			enabledFeatures.tessellationShader = VK_TRUE;
+		if (deviceFeatures_.tessellationShader) {
+			enabledFeatures_.tessellationShader = VK_TRUE;
 		}
 		else {
 			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		}
 		else {
 			splitScreen = false;
@@ -88,8 +88,8 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		plane.loadFromFile(getAssetPath() + "models/displacement_plane.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		colorHeightMap.loadFromFile(getAssetPath() + "textures/stonefloor03_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		plane.loadFromFile(getAssetPath() + "models/displacement_plane.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		colorHeightMap.loadFromFile(getAssetPath() + "textures/stonefloor03_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	void setupDescriptors()
@@ -165,12 +165,12 @@ public:
 
 		// Tessellation pipelines
 		// Solid pipeline
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.solid));
-		if (deviceFeatures.fillModeNonSolid) {
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.solid));
+		if (deviceFeatures_.fillModeNonSolid) {
 			// Wireframe pipeline
 			rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
 			rasterizationState.cullMode = VK_CULL_MODE_NONE;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
 		}
 	}
 
@@ -178,7 +178,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -212,7 +212,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -280,7 +280,7 @@ public:
 			overlay->checkBox("Tessellation displacement", &displacement);
 			overlay->inputFloat("Strength", &uniformData.tessStrength, 0.025f, 3);
 			overlay->inputFloat("Level", &uniformData.tessLevel, 0.5f, 2);
-			if (deviceFeatures.fillModeNonSolid) {
+			if (deviceFeatures_.fillModeNonSolid) {
 				overlay->checkBox("Splitscreen", &splitScreen);
 			}
 

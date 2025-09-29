@@ -88,7 +88,7 @@ class VulkanExample : public VulkanExampleBase {
     camera_.setRotationSpeed(0.5f);
     camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
     // The scene shader uses a clipping plane, so this feature has to be enabled
-    enabledFeatures.shaderClipDistance = VK_TRUE;
+    enabledFeatures_.shaderClipDistance = VK_TRUE;
   }
 
   ~VulkanExample() {
@@ -130,7 +130,7 @@ class VulkanExample : public VulkanExampleBase {
     // Find a suitable depth format
     VkFormat fbDepthFormat;
     VkBool32 validDepthFormat =
-        vks::tools::getSupportedDepthFormat(physicalDevice, &fbDepthFormat);
+        vks::tools::getSupportedDepthFormat(physicalDevice_, &fbDepthFormat);
     assert(validDepthFormat);
 
     // Color attachment
@@ -155,7 +155,7 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateImage(device_, &image, nullptr, &offscreenPass_.color.image));
     vkGetImageMemoryRequirements(device_, offscreenPass_.color.image, &memReqs);
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
+    memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(
         memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr,
                                      &offscreenPass_.color.mem));
@@ -200,7 +200,7 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateImage(device_, &image, nullptr, &offscreenPass_.depth.image));
     vkGetImageMemoryRequirements(device_, offscreenPass_.depth.image, &memReqs);
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(
+    memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(
         memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr,
                                      &offscreenPass_.depth.mem));
@@ -338,9 +338,9 @@ class VulkanExample : public VulkanExampleBase {
         vkglTF::FileLoadingFlags::PreMultiplyVertexColors |
         vkglTF::FileLoadingFlags::FlipY;
     models_.plane.loadFromFile(getAssetPath() + "models/plane.gltf",
-                               vulkanDevice, queue_, glTFLoadingFlags);
+                               vulkanDevice_, queue_, glTFLoadingFlags);
     models_.example.loadFromFile(getAssetPath() + "models/chinesedragon.gltf",
-                                 vulkanDevice, queue_, glTFLoadingFlags);
+                                 vulkanDevice_, queue_, glTFLoadingFlags);
   }
 
   void setupDescriptors() {
@@ -506,7 +506,7 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] = loadShader(getShadersPath() + "offscreen/quad.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.debug));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.debug));
 
     // Mirror
     shaderStages[0] = loadShader(getShadersPath() + "offscreen/mirror.vert.spv",
@@ -514,7 +514,7 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] = loadShader(getShadersPath() + "offscreen/mirror.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.mirror));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.mirror));
 
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 
@@ -526,12 +526,12 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] = loadShader(getShadersPath() + "offscreen/phong.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.shaded));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.shaded));
     // Offscreen
     // Flip cull mode
     rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1,
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.shadedOffscreen));
   }
@@ -541,21 +541,21 @@ class VulkanExample : public VulkanExampleBase {
     for (auto& buffer : uniformBuffers_) {
       // Mesh vertex shader uniform buffer block
       VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                      &buffer.model, sizeof(UniformData)));
       VK_CHECK_RESULT(buffer.model.map());
       // Mirror plane vertex shader uniform buffer block
       VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                      &buffer.mirror, sizeof(UniformData)));
       VK_CHECK_RESULT(buffer.mirror.map());
       // Offscreen vertex shader uniform buffer block
       VK_CHECK_RESULT(
-          vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                      &buffer.offscreen, sizeof(UniformData)));
@@ -609,7 +609,7 @@ class VulkanExample : public VulkanExampleBase {
   }
 
   void buildCommandBuffer() {
-    VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+    VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();

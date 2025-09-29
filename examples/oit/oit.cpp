@@ -101,8 +101,8 @@ public:
 	void getEnabledFeatures() override
 	{
 		// The linked lists are built in a fragment shader using atomic stores, so the sample won't work without that feature available
-		if (deviceFeatures.fragmentStoresAndAtomics) {
-			enabledFeatures.fragmentStoresAndAtomics = VK_TRUE;
+		if (deviceFeatures_.fragmentStoresAndAtomics) {
+			enabledFeatures_.fragmentStoresAndAtomics = VK_TRUE;
 		} else {
 			vks::tools::exitFatal("Selected GPU does not support stores and atomic operations in the fragment stage", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
@@ -111,15 +111,15 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY;
-		models_.sphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.cube.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.sphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.cube.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : renderPassUniformBuffer) {
 			// Create an uniform buffer for a render pass.
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(RenderPassUniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(RenderPassUniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -150,14 +150,14 @@ public:
 		// Create a buffer for GeometrySBO
 		vks::Buffer stagingBuffer;
 	
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&stagingBuffer,
 			sizeof(geometrySBO)));
 		VK_CHECK_RESULT(stagingBuffer.map());
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&geometryPass.geometry,
@@ -169,17 +169,17 @@ public:
 		memcpy(stagingBuffer.mapped, &geometrySBO, sizeof(geometrySBO));
 
 		// Copy data to device
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = sizeof(geometrySBO);
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, geometryPass.geometry.buffer, 1, &copyRegion);
-		vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 		stagingBuffer.destroy();
 		
 		// Create a texture for HeadIndex.
 		// This image will track the head index of each fragment.
-		geometryPass.headIndex.device = vulkanDevice;
+		geometryPass.headIndex.device = vulkanDevice_;
 
 		VkImageCreateInfo imageInfo = vks::initializers::imageCreateInfo();
 		imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -207,7 +207,7 @@ public:
 
 		VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &geometryPass.headIndex.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, geometryPass.headIndex.image, geometryPass.headIndex.deviceMemory, 0));
@@ -234,14 +234,14 @@ public:
 		geometryPass.headIndex.sampler = VK_NULL_HANDLE;
 
 		// Create a buffer for LinkedListSBO
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&geometryPass.linkedList,
 			sizeof(Node) * geometrySBO.maxNodeCount));
 
 		// Change HeadIndex image's layout from UNDEFINED to GENERAL
-		VkCommandBufferAllocateInfo cmdBufAllocInfo = vks::initializers::commandBufferAllocateInfo(cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+		VkCommandBufferAllocateInfo cmdBufAllocInfo = vks::initializers::commandBufferAllocateInfo(cmdPool_, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 
 		VkCommandBuffer cmdBuf;
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(device_, &cmdBufAllocInfo, &cmdBuf));
@@ -387,7 +387,7 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "oit/geometry.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "oit/geometry.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.geometry));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.geometry));
 
 		// Create a color pipeline
 		VkPipelineColorBlendAttachmentState blendAttachmentState = vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
@@ -413,7 +413,7 @@ public:
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
 		rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.color));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.color));
 	}
 
 	void updateUniformBuffers()
@@ -436,7 +436,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -566,7 +566,7 @@ public:
 		prepareGeometryPass();
 		vkResetDescriptorPool(device_, descriptorPool_, 0);
 		updateDescriptors();
-		resized = false;
+		resized_ = false;
 	}
 
 	void destroyGeometryPass()

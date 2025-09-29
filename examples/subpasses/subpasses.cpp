@@ -100,9 +100,9 @@ public:
 		camera_.setPosition(glm::vec3(-3.2f, 1.0f, 5.9f));
 		camera_.setRotation(glm::vec3(0.5f, 210.05f, 0.0f));
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
-		ui.subpass = 2;
+		ui_.subpass = 2;
 
-		enabledFeatures.fragmentStoresAndAtomics = VK_TRUE;
+		enabledFeatures_.fragmentStoresAndAtomics = VK_TRUE;
 	}
 
 	~VulkanExample()
@@ -132,8 +132,8 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	};
 
@@ -186,7 +186,7 @@ public:
 		VK_CHECK_RESULT(vkCreateImage(device_, &image, nullptr, &attachment->image));
 		vkGetImageMemoryRequirements(device_, attachment->image, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &attachment->mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, attachment->image, attachment->mem, 0));
 
@@ -256,7 +256,7 @@ public:
 			attachments[1] = this->attachments.position.view;
 			attachments[2] = this->attachments.normal.view;
 			attachments[3] = this->attachments.albedo.view;
-			attachments[4] = depthStencil.view;
+			attachments[4] = depthStencil_.view;
 			VK_CHECK_RESULT(vkCreateFramebuffer(device_, &frameBufferCreateInfo, nullptr, &frameBuffers_[i]));
 		}
 	}
@@ -309,7 +309,7 @@ public:
 		attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		// Depth attachment
-		attachments[4].format = depthFormat;
+		attachments[4].format = depthFormat_;
 		attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -428,9 +428,9 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.scene.loadFromFile(getAssetPath() + "models/samplebuilding.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.transparent.loadFromFile(getAssetPath() + "models/samplebuilding_glass.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		textures.glass.loadFromFile(getAssetPath() + "textures/colored_glass_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		models_.scene.loadFromFile(getAssetPath() + "models/samplebuilding.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.transparent.loadFromFile(getAssetPath() + "models/samplebuilding_glass.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		textures.glass.loadFromFile(getAssetPath() + "textures/colored_glass_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	void setupDescriptors()
@@ -565,7 +565,7 @@ public:
 		// Offscreen scene rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "subpasses/gbuffer.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "subpasses/gbuffer.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.offscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.offscreen));
 
 		// Composition pass
 		VkPipelineVertexInputStateCreateInfo emptyInputState{ .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
@@ -578,7 +578,7 @@ public:
 		depthStencilState.depthWriteEnable = VK_FALSE;
 		shaderStages[0] = loadShader(getShadersPath() + "subpasses/composition.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "subpasses/composition.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.composition));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.composition));
 
 		// Transparent forward pass
 		// Uses blending
@@ -596,7 +596,7 @@ public:
 		pipelineCI.subpass = 2;
 		shaderStages[0] = loadShader(getShadersPath() + "subpasses/transparent.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "subpasses/transparent.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.transparent));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.transparent));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -604,10 +604,10 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Matrices
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.GBuffer, sizeof(uboGBuffer));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.GBuffer, sizeof(uboGBuffer));
 			VK_CHECK_RESULT(buffer.GBuffer.map());
 			// Lights
-			vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.lights, lights.size() * sizeof(Light));
+			vulkanDevice_->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.lights, lights.size() * sizeof(Light));
 			VK_CHECK_RESULT(buffer.lights.map());
 		}
 	}
@@ -656,7 +656,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

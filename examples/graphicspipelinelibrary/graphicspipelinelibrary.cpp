@@ -72,7 +72,7 @@ public:
 		// Enable required extension features
 		graphicsPipelineLibraryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
 		graphicsPipelineLibraryFeatures.graphicsPipelineLibrary = VK_TRUE;
-		deviceCreatepNextChain = &graphicsPipelineLibraryFeatures;
+		deviceCreatepNextChain_ = &graphicsPipelineLibraryFeatures;
 	}
 
 	~VulkanExample()
@@ -99,7 +99,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		scene.loadFromFile(getAssetPath() + "models/color_teapot_spheres.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void setupDescriptors()
@@ -187,7 +187,7 @@ public:
 			pipelineLibraryCI.pNext = &libraryInfo;
 			pipelineLibraryCI.pInputAssemblyState = &inputAssemblyState;
 			pipelineLibraryCI.pVertexInputState = &vertexInputState;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineLibraryCI, nullptr, &pipelineLibrary.vertexInputInterface));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineLibraryCI, nullptr, &pipelineLibrary.vertexInputInterface));
 		}
 
 		// Creata a pipeline library for the vertex shader stage
@@ -237,7 +237,7 @@ public:
 			pipelineLibraryCI.pDynamicState = &dynamicInfo;
 			pipelineLibraryCI.pViewportState = &viewportState;
 			pipelineLibraryCI.pRasterizationState = &rasterizationState;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineLibraryCI, nullptr, &pipelineLibrary.preRasterizationShaders));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineLibraryCI, nullptr, &pipelineLibrary.preRasterizationShaders));
 
 			delete[] shaderInfo.code;
 		}
@@ -260,7 +260,7 @@ public:
 			pipelineLibraryCI.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
 			pipelineLibraryCI.pColorBlendState = &colorBlendState;
 			pipelineLibraryCI.pMultisampleState = &multisampleState;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineLibraryCI, nullptr, &pipelineLibrary.fragmentOutputInterface));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineLibraryCI, nullptr, &pipelineLibrary.fragmentOutputInterface));
 		}
 	}
 
@@ -383,7 +383,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -421,7 +421,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

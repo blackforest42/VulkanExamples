@@ -39,13 +39,13 @@ VulkanExample::~VulkanExample()
 
 void VulkanExample::getEnabledFeatures()
 {
-	enabledFeatures.samplerAnisotropy = deviceFeatures.samplerAnisotropy;
+	enabledFeatures_.samplerAnisotropy = deviceFeatures_.samplerAnisotropy;
 	// POI
 	enabledPhysicalDeviceShadingRateImageFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
 	enabledPhysicalDeviceShadingRateImageFeaturesKHR.attachmentFragmentShadingRate = VK_TRUE;
 	enabledPhysicalDeviceShadingRateImageFeaturesKHR.pipelineFragmentShadingRate = VK_FALSE;
 	enabledPhysicalDeviceShadingRateImageFeaturesKHR.primitiveFragmentShadingRate = VK_FALSE;
-	deviceCreatepNextChain = &enabledPhysicalDeviceShadingRateImageFeaturesKHR;
+	deviceCreatepNextChain_ = &enabledPhysicalDeviceShadingRateImageFeaturesKHR;
 }
 
 /*
@@ -63,12 +63,12 @@ void VulkanExample::handleResize()
 	// Recreate the render pass and update it with the new fragment shading rate image resolution
 	vkDestroyRenderPass(device_, renderPass_, nullptr);
 	setupRenderPass();
-	resized = false;
+	resized_ = false;
 }
 
 void VulkanExample::setupFrameBuffer()
 {
-	if (resized) {
+	if (resized_) {
 		handleResize();
 	}
 
@@ -79,7 +79,7 @@ void VulkanExample::setupFrameBuffer()
 	VkImageView attachments[3]{};
 
 	// Depth/Stencil attachment is the same for all frame buffers
-	attachments[1] = depthStencil.view;
+	attachments[1] = depthStencil_.view;
 	// Fragment shading rate attachment
 	attachments[2] = shadingRateImage.view;
 
@@ -124,7 +124,7 @@ void VulkanExample::setupRenderPass()
 	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	// Depth attachment
 	attachments[1].sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
-	attachments[1].format = depthFormat;
+	attachments[1].format = depthFormat_;
 	attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -217,7 +217,7 @@ void VulkanExample::setupRenderPass()
 void VulkanExample::loadAssets()
 {
 	vkglTF::descriptorBindingFlags = vkglTF::DescriptorBindingFlags::ImageBaseColor | vkglTF::DescriptorBindingFlags::ImageNormalMap;
-	scene.loadFromFile(getAssetPath() + "models/sponza/sponza.gltf", vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices);
+	scene.loadFromFile(getAssetPath() + "models/sponza/sponza.gltf", vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices);
 }
 
 void VulkanExample::setupDescriptors()
@@ -268,12 +268,12 @@ void VulkanExample::prepareShadingRateImage()
 	VkPhysicalDeviceProperties2 deviceProperties2{};
 	deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 	deviceProperties2.pNext = &physicalDeviceShadingRateImageProperties;
-	vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProperties2);
+	vkGetPhysicalDeviceProperties2(physicalDevice_, &deviceProperties2);
 
 	// We need to check if the requested format for the shading rate attachment supports the required flag
 	const VkFormat imageFormat = VK_FORMAT_R8_UINT;
 	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
+	vkGetPhysicalDeviceFormatProperties(physicalDevice_, imageFormat, &formatProperties);
 	if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR))
 	{
 		throw std::runtime_error("Selected shading rate attachment image format does not fragment shading rate");
@@ -305,7 +305,7 @@ void VulkanExample::prepareShadingRateImage()
 	VkMemoryAllocateInfo memAllloc{};
 	memAllloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memAllloc.allocationSize = memReqs.size;
-	memAllloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	memAllloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllloc, nullptr, &shadingRateImage.memory));
 	VK_CHECK_RESULT(vkBindImageMemory(device_, shadingRateImage.image, shadingRateImage.memory, 0));
 
@@ -336,14 +336,14 @@ void VulkanExample::prepareShadingRateImage()
 	// Get a list of available shading rate patterns
 	std::vector<VkPhysicalDeviceFragmentShadingRateKHR> fragmentShadingRates{};
 	uint32_t fragmentShadingRatesCount = 0;
-	vkGetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice, &fragmentShadingRatesCount, nullptr);
+	vkGetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice_, &fragmentShadingRatesCount, nullptr);
 	if (fragmentShadingRatesCount > 0) {
 		fragmentShadingRates.resize(fragmentShadingRatesCount);
 		for (VkPhysicalDeviceFragmentShadingRateKHR& fragmentShadingRate : fragmentShadingRates) {
 			// In addition to the value, we also need to set the sType for each rate to comply with the spec or else the call to vkGetPhysicalDeviceFragmentShadingRatesKHR will result in undefined behaviour
 			fragmentShadingRate.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR;
 		}
-		vkGetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice, &fragmentShadingRatesCount, fragmentShadingRates.data());
+		vkGetPhysicalDeviceFragmentShadingRatesKHR(physicalDevice_, &fragmentShadingRatesCount, fragmentShadingRates.data());
 	}
 	// Create a circular pattern from the available list of fragment shading rates with decreasing sampling rates outwards (max. range, pattern)
 	// Shading rates returned by vkGetPhysicalDeviceFragmentShadingRatesKHR are ordered from largest to smallest
@@ -389,7 +389,7 @@ void VulkanExample::prepareShadingRateImage()
 	memReqs = {};
 	vkGetBufferMemoryRequirements(device_, stagingBuffer, &memReqs);
 	memAllocInfo.allocationSize = memReqs.size;
-	memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &stagingMemory));
 	VK_CHECK_RESULT(vkBindBufferMemory(device_, stagingBuffer, stagingMemory, 0));
 
@@ -401,7 +401,7 @@ void VulkanExample::prepareShadingRateImage()
 	delete[] shadingRatePatternData;
 
 	// Upload
-	VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 	VkImageSubresourceRange subresourceRange = {};
 	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	subresourceRange.levelCount = 1;
@@ -435,7 +435,7 @@ void VulkanExample::prepareShadingRateImage()
 		imageMemoryBarrier.subresourceRange = subresourceRange;
 		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 	}
-	vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+	vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 	vkFreeMemory(device_, stagingMemory, nullptr);
 	vkDestroyBuffer(device_, stagingBuffer, nullptr);
@@ -482,17 +482,17 @@ void VulkanExample::preparePipelines()
 	};
 	VkSpecializationInfo specializationInfo = vks::initializers::specializationInfo(specializationMapEntries, sizeof(specializationData), &specializationData);
 	shaderStages[1].pSpecializationInfo = &specializationInfo;
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.opaque));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.opaque));
 
 	specializationData.alphaMask = true;
 	rasterizationStateCI.cullMode = VK_CULL_MODE_NONE;
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.masked));
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.masked));
 }
 
 void VulkanExample::prepareUniformBuffers()
 {
 	for (auto& buffer : uniformBuffers_) {
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 		VK_CHECK_RESULT(buffer.map());
 	}
 }
@@ -522,7 +522,7 @@ void VulkanExample::prepare()
 
 void VulkanExample::buildCommandBuffer()
 {
-	VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+	VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 	
 	VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

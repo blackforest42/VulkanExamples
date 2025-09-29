@@ -121,19 +121,19 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable sample rate shading filtering if supported
-		if (deviceFeatures.sampleRateShading) {
-			enabledFeatures.sampleRateShading = VK_TRUE;
+		if (deviceFeatures_.sampleRateShading) {
+			enabledFeatures_.sampleRateShading = VK_TRUE;
 		}
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	};
 
 	// Prepare the framebuffer for offscreen rendering with multiple attachments used as render targets inside the fragment shaders
 	void deferredSetup()
 	{
-		offscreenframeBuffers = new vks::Framebuffer(vulkanDevice);
+		offscreenframeBuffers = new vks::Framebuffer(vulkanDevice_);
 
 #if defined(__ANDROID__)
 		// Use max. screen dimension as deferred framebuffer size
@@ -168,7 +168,7 @@ public:
 		// Depth attachment
 		// Find a suitable depth format
 		VkFormat attDepthFormat;
-		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &attDepthFormat);
+		VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice_, &attDepthFormat);
 		assert(validDepthFormat);
 
 		attachmentInfo.format = attDepthFormat;
@@ -185,12 +185,12 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.model.loadFromFile(getAssetPath() + "models/armor/armor.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.background.loadFromFile(getAssetPath() + "models/deferred_box.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		textures.model.colorMap.loadFromFile(getAssetPath() + "models/armor/colormap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.model.normalMap.loadFromFile(getAssetPath() + "models/armor/normalmap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.background.colorMap.loadFromFile(getAssetPath() + "textures/stonefloor02_color_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.background.normalMap.loadFromFile(getAssetPath() + "textures/stonefloor02_normal_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		models_.model.loadFromFile(getAssetPath() + "models/armor/armor.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.background.loadFromFile(getAssetPath() + "models/deferred_box.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		textures.model.colorMap.loadFromFile(getAssetPath() + "models/armor/colormap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.model.normalMap.loadFromFile(getAssetPath() + "models/armor/normalmap_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.background.colorMap.loadFromFile(getAssetPath() + "textures/stonefloor02_color_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.background.normalMap.loadFromFile(getAssetPath() + "textures/stonefloor02_normal_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	void setupDescriptors()
@@ -327,11 +327,11 @@ public:
 		shaderStages[0] = loadShader(getShadersPath() + "deferredmultisampling/deferred.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "deferredmultisampling/deferred.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		shaderStages[1].pSpecializationInfo = &specializationInfo;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.deferred));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.deferred));
 
 		// No MSAA (1 sample)
 		specializationData = 1;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.deferredNoMSAA));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.deferredNoMSAA));
 
 		// Vertex input state from glTF model for pipeline rendering models
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::Tangent });
@@ -361,11 +361,11 @@ public:
 		colorBlendState.attachmentCount = static_cast<uint32_t>(blendAttachmentStates.size());
 		colorBlendState.pAttachments = blendAttachmentStates.data();
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.offscreen));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.offscreen));
 
 		multisampleState.sampleShadingEnable = VK_TRUE;
 		multisampleState.minSampleShading = 0.25f;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.offscreenSampleShading));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.offscreenSampleShading));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -373,10 +373,10 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Offscreen
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.offscreen, sizeof(UniformDataOffscreen)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.offscreen, sizeof(UniformDataOffscreen)));
 			VK_CHECK_RESULT(buffer.offscreen.map());
 			// Composition
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.composition, sizeof(UniformDataComposition)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.composition, sizeof(UniformDataComposition)));
 			VK_CHECK_RESULT(buffer.composition.map());
 		}
 
@@ -432,7 +432,7 @@ public:
 	// Returns the maximum sample count usable by the platform
 	VkSampleCountFlagBits getMaxUsableSampleCount()
 	{
-		VkSampleCountFlags counts = std::min(deviceProperties.limits.framebufferColorSampleCounts, deviceProperties.limits.framebufferDepthSampleCounts);
+		VkSampleCountFlags counts = std::min(deviceProperties_.limits.framebufferColorSampleCounts, deviceProperties_.limits.framebufferDepthSampleCounts);
 		// Note: Vulkan offers up to 64 bits, but we don't want to go higher than 8xMSAA in this sample)
 		if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
 		if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
@@ -454,7 +454,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -542,7 +542,7 @@ public:
 		if (overlay->header("Settings")) {
 			overlay->comboBox("Display", &debugDisplayTarget, { "Final composition", "Position", "Normals", "Albedo", "Specular" });
 			overlay->checkBox("MSAA", &useMSAA);
-			if (vulkanDevice->features.sampleRateShading) {
+			if (vulkanDevice_->features.sampleRateShading) {
 				overlay->checkBox("Sample rate shading", &useSampleShading);
 			}
 		}

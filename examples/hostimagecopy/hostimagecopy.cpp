@@ -67,7 +67,7 @@ public:
 		// Enable host image copy feature
 		enabledPhysicalDeviceHostImageCopyFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT;
 		enabledPhysicalDeviceHostImageCopyFeaturesEXT.hostImageCopy = VK_TRUE;
-		deviceCreatepNextChain = &enabledPhysicalDeviceHostImageCopyFeaturesEXT;
+		deviceCreatepNextChain_ = &enabledPhysicalDeviceHostImageCopyFeaturesEXT;
 	}
 
 	~VulkanExample() override
@@ -87,8 +87,8 @@ public:
 	void getEnabledFeatures() override
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		};
 	}
 
@@ -149,7 +149,7 @@ public:
 		VkFormatProperties2 formatProperties2{};
 		formatProperties2.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
 		formatProperties2.pNext = &formatProperties3;
-		vkGetPhysicalDeviceFormatProperties2(physicalDevice, imageFormat, &formatProperties2);
+		vkGetPhysicalDeviceFormatProperties2(physicalDevice_, imageFormat, &formatProperties2);
 
 		if ((formatProperties3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT_EXT) == 0) {
 			vks::tools::exitFatal("The selected image format does not support the required host transfer bit.", -1);
@@ -174,7 +174,7 @@ public:
 		VkMemoryRequirements memReqs = {};
 		vkGetImageMemoryRequirements(device_, texture.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
-		memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device_, texture.image, texture.deviceMemory, 0));
 
@@ -249,7 +249,7 @@ public:
 		sampler.compareOp = VK_COMPARE_OP_NEVER;
 		sampler.minLod = 0.0f;
 		sampler.maxLod = (float)texture.mipLevels;
-		sampler.maxAnisotropy = vulkanDevice->properties.limits.maxSamplerAnisotropy;
+		sampler.maxAnisotropy = vulkanDevice_->properties.limits.maxSamplerAnisotropy;
 		sampler.anisotropyEnable = VK_TRUE;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &texture.sampler));
@@ -347,14 +347,14 @@ public:
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
 		pipelineCreateInfo.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV, vkglTF::VertexComponent::Normal });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCreateInfo, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -370,7 +370,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		plane.loadFromFile(getAssetPath() + "models/plane_z.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		plane.loadFromFile(getAssetPath() + "models/plane_z.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 	}
 
 	void prepare() override
@@ -392,7 +392,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

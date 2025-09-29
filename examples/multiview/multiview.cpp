@@ -69,7 +69,7 @@ public:
 		// Enable required extension features
 		physicalDeviceMultiviewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR;
 		physicalDeviceMultiviewFeatures.multiview = VK_TRUE;
-		deviceCreatepNextChain = &physicalDeviceMultiviewFeatures;
+		deviceCreatepNextChain_ = &physicalDeviceMultiviewFeatures;
 	}
 
 	~VulkanExample()
@@ -111,7 +111,7 @@ public:
 		{
 			VkImageCreateInfo imageCI= vks::initializers::imageCreateInfo();
 			imageCI.imageType = VK_IMAGE_TYPE_2D;
-			imageCI.format = depthFormat;
+			imageCI.format = depthFormat_;
 			imageCI.extent = { width_, height_, 1 };
 			imageCI.mipLevels = 1;
 			imageCI.arrayLayers = multiviewLayerCount;
@@ -133,11 +133,11 @@ public:
 			depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 			depthStencilView.pNext = NULL;
 			depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			depthStencilView.format = depthFormat;
+			depthStencilView.format = depthFormat_;
 			depthStencilView.flags = 0;
 			depthStencilView.subresourceRange = {};
 			depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-			if (depthFormat >= VK_FORMAT_D16_UNORM_S8_UINT) {
+			if (depthFormat_ >= VK_FORMAT_D16_UNORM_S8_UINT) {
 				depthStencilView.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 			}
 			depthStencilView.subresourceRange.baseMipLevel = 0;
@@ -147,7 +147,7 @@ public:
 			depthStencilView.image = multiviewPass.depth.image;
 
 			memAllocInfo.allocationSize = memReqs.size;
-			memAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &multiviewPass.depth.memory));
 			VK_CHECK_RESULT(vkBindImageMemory(device_, multiviewPass.depth.image, multiviewPass.depth.memory, 0));
 			VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilView, nullptr, &multiviewPass.depth.view));
@@ -173,7 +173,7 @@ public:
 
 			VkMemoryAllocateInfo memoryAllocInfo = vks::initializers::memoryAllocateInfo();
 			memoryAllocInfo.allocationSize = memReqs.size;
-			memoryAllocInfo.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memoryAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK_CHECK_RESULT(vkAllocateMemory(device_, &memoryAllocInfo, nullptr, &multiviewPass.color.memory));
 			VK_CHECK_RESULT(vkBindImageMemory(device_, multiviewPass.color.image, multiviewPass.color.memory, 0));
 
@@ -226,7 +226,7 @@ public:
 			attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			// Depth attachment
-			attachments[1].format = depthFormat;
+			attachments[1].format = depthFormat_;
 			attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 			attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -334,7 +334,7 @@ public:
 
 	void loadAssets()
 	{
-		scene.loadFromFile(getAssetPath() + "models/sampleroom.gltf", vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
+		scene.loadFromFile(getAssetPath() + "models/sampleroom.gltf", vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY);
 	}
 
 	void prepareDescriptors()
@@ -388,7 +388,7 @@ public:
 		deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR;
 		deviceFeatures2.pNext = &extFeatures;
 		PFN_vkGetPhysicalDeviceFeatures2KHR vkGetPhysicalDeviceFeatures2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2KHR>(vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceFeatures2KHR"));
-		vkGetPhysicalDeviceFeatures2KHR(physicalDevice, &deviceFeatures2);
+		vkGetPhysicalDeviceFeatures2KHR(physicalDevice_, &deviceFeatures2);
 		std::cout << "Multiview features:" << std::endl;
 		std::cout << "\tmultiview = " << extFeatures.multiview << std::endl;
 		std::cout << "\tmultiviewGeometryShader = " << extFeatures.multiviewGeometryShader << std::endl;
@@ -401,7 +401,7 @@ public:
 		deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
 		deviceProps2.pNext = &extProps;
 		PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceProperties2KHR"));
-		vkGetPhysicalDeviceProperties2KHR(physicalDevice, &deviceProps2);
+		vkGetPhysicalDeviceProperties2KHR(physicalDevice_, &deviceProps2);
 		std::cout << "Multiview properties:" << std::endl;
 		std::cout << "\tmaxMultiviewViewCount = " << extProps.maxMultiviewViewCount << std::endl;
 		std::cout << "\tmaxMultiviewInstanceIndex = " << extProps.maxMultiviewInstanceIndex << std::endl;
@@ -439,7 +439,7 @@ public:
 		shaderStages[1] = loadShader(getShadersPath() + "multiview/multiview.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 		pipelineCI.stageCount = 2;
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 
 		/*
 			Full screen pass
@@ -469,7 +469,7 @@ public:
 			pipelineCI.pVertexInputState = &emptyInputState;
 			pipelineCI.layout = pipelineLayout;
 			pipelineCI.renderPass = renderPass_;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &viewDisplayPipelines[i]));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &viewDisplayPipelines[i]));
 		}
 
 	}
@@ -478,7 +478,7 @@ public:
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -559,12 +559,12 @@ public:
 		prepareMultiview();
 		updateDescriptors();
 		
-		resized = false;
+		resized_ = false;
 	}
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 

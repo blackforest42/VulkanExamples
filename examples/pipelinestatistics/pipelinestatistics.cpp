@@ -73,17 +73,17 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Support for pipeline statistics is optional
-		if (deviceFeatures.pipelineStatisticsQuery) {
-			enabledFeatures.pipelineStatisticsQuery = VK_TRUE;
+		if (deviceFeatures_.pipelineStatisticsQuery) {
+			enabledFeatures_.pipelineStatisticsQuery = VK_TRUE;
 		}
 		else {
 			vks::tools::exitFatal("Selected GPU does not support pipeline statistics!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		}
-		if (deviceFeatures.tessellationShader) {
-			enabledFeatures.tessellationShader = VK_TRUE;
+		if (deviceFeatures_.tessellationShader) {
+			enabledFeatures_.tessellationShader = VK_TRUE;
 		}
 	}
 
@@ -98,7 +98,7 @@ public:
 			"Clipping stage primitives output    ",
 			"Fragment shader invocations        "
 		};
-		if (deviceFeatures.tessellationShader) {
+		if (deviceFeatures_.tessellationShader) {
 			pipelineStatNames.push_back("Tess. control shader patches       ");
 			pipelineStatNames.push_back("Tess. eval. shader invocations     ");
 		}
@@ -116,7 +116,7 @@ public:
 			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
 			VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
 			VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
-		if (deviceFeatures.tessellationShader) {
+		if (deviceFeatures_.tessellationShader) {
 			queryPoolInfo.pipelineStatistics |=
 				VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT |
 				VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT;
@@ -151,7 +151,7 @@ public:
 		models_.names = { "Sphere", "Teapot", "Torusknot", "Venus" };
 		models_.objects.resize(filenames.size());
 		for (size_t i = 0; i < filenames.size(); i++) {
-			models_.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i], vulkanDevice, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
+			models_.objects[i].loadFromFile(getAssetPath() + "models/" + filenames[i], vulkanDevice_, queue_, vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::FlipY);
 		}
 	}
 
@@ -256,14 +256,14 @@ public:
 
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipeline));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipeline));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
 	void prepareUniformBuffers()
 	{
 		for (auto& buffer : uniformBuffers_) {
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData), &uniformData));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -288,7 +288,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -374,10 +374,10 @@ public:
 			recreatePipeline |= overlay->checkBox("Blending", &blending);
 			recreatePipeline |= overlay->checkBox("Discard", &discard);
 			// These features may not be supported by all implementations
-			if (deviceFeatures.fillModeNonSolid) {
+			if (deviceFeatures_.fillModeNonSolid) {
 				recreatePipeline |= overlay->checkBox("Wireframe", &wireframe);
 			}
-			if (deviceFeatures.tessellationShader) {
+			if (deviceFeatures_.tessellationShader) {
 				recreatePipeline |= overlay->checkBox("Tessellation", &tessellation);
 			}
 			if (recreatePipeline) {

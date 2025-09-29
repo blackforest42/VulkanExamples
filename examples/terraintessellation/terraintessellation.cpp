@@ -138,22 +138,22 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Tessellation shader support is required for this example
-		if (deviceFeatures.tessellationShader) {
-			enabledFeatures.tessellationShader = VK_TRUE;
+		if (deviceFeatures_.tessellationShader) {
+			enabledFeatures_.tessellationShader = VK_TRUE;
 		} else {
 			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 		// Fill mode non solid is required for wireframe display
-		if (deviceFeatures.fillModeNonSolid) {
-			enabledFeatures.fillModeNonSolid = VK_TRUE;
+		if (deviceFeatures_.fillModeNonSolid) {
+			enabledFeatures_.fillModeNonSolid = VK_TRUE;
 		};
 		// Enable pipeline statistics if supported (to display them in the UI)
-		if (deviceFeatures.pipelineStatisticsQuery) {
-			enabledFeatures.pipelineStatisticsQuery = VK_TRUE;
+		if (deviceFeatures_.pipelineStatisticsQuery) {
+			enabledFeatures_.pipelineStatisticsQuery = VK_TRUE;
 		};
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	}
 
@@ -173,12 +173,12 @@ public:
 		VK_CHECK_RESULT(vkCreateBuffer(device_, &bufferCreateInfo, nullptr, &queryResult.buffer));
 		vkGetBufferMemoryRequirements(device_, queryResult.buffer, &memReqs);
 		memAlloc.allocationSize = memReqs.size;
-		memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAlloc, nullptr, &queryResult.memory));
 		VK_CHECK_RESULT(vkBindBufferMemory(device_, queryResult.buffer, queryResult.memory, 0));
 
 		// Create query pool
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			VkQueryPoolCreateInfo queryPoolInfo = {};
 			queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
 			queryPoolInfo.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
@@ -193,14 +193,14 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.skysphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.skysphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 
-		textures.skySphere.loadFromFile(getAssetPath() + "textures/skysphere_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.skySphere.loadFromFile(getAssetPath() + "textures/skysphere_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 		// Terrain textures are stored in a texture array with layers corresponding to terrain height
-		textures.terrainArray.loadFromFile(getAssetPath() + "textures/terrain_texturearray_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.terrainArray.loadFromFile(getAssetPath() + "textures/terrain_texturearray_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 
 		// Height data is stored in a one-channel texture
-		textures.heightMap.loadFromFile(getAssetPath() + "textures/terrain_heightmap_r16.ktx", VK_FORMAT_R16_UNORM, vulkanDevice, queue_);
+		textures.heightMap.loadFromFile(getAssetPath() + "textures/terrain_heightmap_r16.ktx", VK_FORMAT_R16_UNORM, vulkanDevice_, queue_);
 
 		VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
 
@@ -232,7 +232,7 @@ public:
 		samplerInfo.minLod = 0.0f;
 		samplerInfo.maxLod = (float)textures.terrainArray.mipLevels;
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		if (deviceFeatures.samplerAnisotropy) {
+		if (deviceFeatures_.samplerAnisotropy) {
 			samplerInfo.maxAnisotropy = 4.0f;
 			samplerInfo.anisotropyEnable = VK_TRUE;
 		}
@@ -352,34 +352,34 @@ public:
 
 		// Stage the terrain vertex data to the device
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&vertexStaging,
 			vertexBufferSize,
 			vertices));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&indexStaging,
 			indexBufferSize,
 			indices));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&terrain.vertexBuffer,
 			vertexBufferSize));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			&terrain.indexBuffer,
 			indexBufferSize));
 
 		// Copy from staging buffers
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkBufferCopy copyRegion = {};
 
@@ -389,7 +389,7 @@ public:
 		copyRegion.size = indexBufferSize;
 		vkCmdCopyBuffer(copyCmd, indexStaging.buffer, terrain.indexBuffer.buffer, 1, &copyRegion);
 
-		vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 		vkDestroyBuffer(device_, vertexStaging.buffer, nullptr);
 		vkFreeMemory(device_, vertexStaging.memory, nullptr);
@@ -508,12 +508,12 @@ public:
 		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCI.pStages = shaderStages.data();
 		pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState({ vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal, vkglTF::VertexComponent::UV });
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.terrain));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.terrain));
 
 		// Terrain wireframe pipeline (if devie supports it)
-		if (deviceFeatures.fillModeNonSolid) {
+		if (deviceFeatures_.fillModeNonSolid) {
 			rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
-			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
+			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.wireframe));
 		};
 
 		// Skysphere pipeline
@@ -529,7 +529,7 @@ public:
 		pipelineCI.layout = pipelineLayouts_.skysphere;
 		shaderStages[0] = loadShader(getShadersPath() + "terraintessellation/skysphere.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
 		shaderStages[1] = loadShader(getShadersPath() + "terraintessellation/skysphere.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.skysphere));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skysphere));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
@@ -537,10 +537,10 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Tessellation shader stages uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.terrainTessellation, sizeof(UniformDataTessellation)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.terrainTessellation, sizeof(UniformDataTessellation)));
 			VK_CHECK_RESULT(buffer.terrainTessellation.map());
 			// Skysphere vertex shader uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.skysphereVertex, sizeof(UniformDataVertex)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer.skysphereVertex, sizeof(UniformDataVertex)));
 			VK_CHECK_RESULT(buffer.skysphereVertex.map());
 		}
 	}
@@ -580,7 +580,7 @@ public:
 		VulkanExampleBase::prepare();
 		loadAssets();
 		generateTerrain();
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			setupQueryResultBuffer();
 		}
 		prepareUniformBuffers();
@@ -591,7 +591,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
@@ -611,7 +611,7 @@ public:
 
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
 
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			vkCmdResetQueryPool(cmdBuffer, queryPool, 0, 2);
 		}
 
@@ -633,7 +633,7 @@ public:
 		models_.skysphere.draw(cmdBuffer);
 
 		// Tessellated terrain
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			// Begin pipeline statistics query
 			vkCmdBeginQuery(cmdBuffer, queryPool, 0, 0);
 		}
@@ -643,7 +643,7 @@ public:
 		vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &terrain.vertexBuffer.buffer, offsets);
 		vkCmdBindIndexBuffer(cmdBuffer, terrain.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(cmdBuffer, terrain.indexCount, 1, 0, 0, 0);
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			// End pipeline statistics query
 			vkCmdEndQuery(cmdBuffer, queryPool, 0);
 		}
@@ -664,7 +664,7 @@ public:
 		buildCommandBuffer();
 		VulkanExampleBase::submitFrame();
 		// Read query results for displaying in next frame (if the device supports pipeline statistics)
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			// We use vkGetQueryResults to copy the results into a host visible buffer
 			vkGetQueryPoolResults(
 				device_,
@@ -684,11 +684,11 @@ public:
 
 			overlay->checkBox("Tessellation", &tessellation);
 			overlay->inputFloat("Factor", &uniformDataTessellation.tessellationFactor, 0.05f, 2);
-			if (deviceFeatures.fillModeNonSolid) {
+			if (deviceFeatures_.fillModeNonSolid) {
 				overlay->checkBox("Wireframe", &wireframe);
 			}
 		}
-		if (deviceFeatures.pipelineStatisticsQuery) {
+		if (deviceFeatures_.pipelineStatisticsQuery) {
 			if (overlay->header("Pipeline statistics")) {
 				overlay->text("VS invocations: %d", pipelineStats[0]);
 				overlay->text("TE invocations: %d", pipelineStats[1]);

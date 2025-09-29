@@ -98,19 +98,19 @@ public:
 	virtual void getEnabledFeatures()
 	{
 		// Enable anisotropic filtering if supported
-		if (deviceFeatures.samplerAnisotropy) {
-			enabledFeatures.samplerAnisotropy = VK_TRUE;
+		if (deviceFeatures_.samplerAnisotropy) {
+			enabledFeatures_.samplerAnisotropy = VK_TRUE;
 		}
 	};
 
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		models_.rock.loadFromFile(getAssetPath() + "models/rock01.gltf", vulkanDevice, queue_, glTFLoadingFlags);
-		models_.planet.loadFromFile(getAssetPath() + "models/lavaplanet.gltf", vulkanDevice, queue_, glTFLoadingFlags);
+		models_.rock.loadFromFile(getAssetPath() + "models/rock01.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
+		models_.planet.loadFromFile(getAssetPath() + "models/lavaplanet.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
 
-		textures.planet.loadFromFile(getAssetPath() + "textures/lavaplanet_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
-		textures.rocks.loadFromFile(getAssetPath() + "textures/texturearray_rocks_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice, queue_);
+		textures.planet.loadFromFile(getAssetPath() + "textures/lavaplanet_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		textures.rocks.loadFromFile(getAssetPath() + "textures/texturearray_rocks_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	void setupDescriptors()
@@ -235,7 +235,7 @@ public:
 		// Use all input bindings and attribute descriptions
 		inputState.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
 		inputState.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.instancedRocks));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.instancedRocks));
 
 		// Planet rendering pipeline
 		shaderStages[0] = loadShader(getShadersPath() + "instancing/planet.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -243,7 +243,7 @@ public:
 		// Only use the non-instanced input bindings and attribute descriptions
 		inputState.vertexBindingDescriptionCount = 1;
 		inputState.vertexAttributeDescriptionCount = 4;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.planet));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.planet));
 
 		// Star field pipeline
 		rasterizationState.cullMode = VK_CULL_MODE_NONE;
@@ -253,7 +253,7 @@ public:
 		// Vertices are generated in the vertex shader
 		inputState.vertexBindingDescriptionCount = 0;
 		inputState.vertexAttributeDescriptionCount = 0;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache, 1, &pipelineCI, nullptr, &pipelines_.starfield));
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.starfield));
 	}
 
 	// Create a buffer with per-instance data that is sourced in the shaders
@@ -303,7 +303,7 @@ public:
 			VkBuffer buffer;
 		} stagingBuffer;
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			instanceBuffer.size,
@@ -311,7 +311,7 @@ public:
 			&stagingBuffer.memory,
 			instanceData.data()));
 
-		VK_CHECK_RESULT(vulkanDevice->createBuffer(
+		VK_CHECK_RESULT(vulkanDevice_->createBuffer(
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			instanceBuffer.size,
@@ -319,7 +319,7 @@ public:
 			&instanceBuffer.memory));
 
 		// Copy to staging buffer
-		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkBufferCopy copyRegion = { };
 		copyRegion.size = instanceBuffer.size;
@@ -330,7 +330,7 @@ public:
 			1,
 			&copyRegion);
 
-		vulkanDevice->flushCommandBuffer(copyCmd, queue_, true);
+		vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
 
 		instanceBuffer.descriptor.range = instanceBuffer.size;
 		instanceBuffer.descriptor.buffer = instanceBuffer.buffer;
@@ -345,7 +345,7 @@ public:
 	{
 		for (auto& buffer : uniformBuffers_) {
 			// Scene matrices uniform buffer
-			VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
+			VK_CHECK_RESULT(vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &buffer, sizeof(UniformData)));
 			VK_CHECK_RESULT(buffer.map());
 		}
 	}
@@ -375,7 +375,7 @@ public:
 
 	void buildCommandBuffer()
 	{
-		VkCommandBuffer cmdBuffer = drawCmdBuffers[currentBuffer_];
+		VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
 		
 		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
 
