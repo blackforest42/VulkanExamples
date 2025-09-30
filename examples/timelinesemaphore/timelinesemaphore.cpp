@@ -88,8 +88,8 @@ public:
 		camera_.setTranslation(glm::vec3(0.0f, 0.0f, -14.0f));
 		camera_.movementSpeed = 2.5f;
 
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
 		enabledTimelineSemaphoreFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR;
 		enabledTimelineSemaphoreFeaturesKHR.timelineSemaphore = VK_TRUE;

@@ -84,9 +84,9 @@ public:
 		camera_.setTranslation(glm::vec3(0.0f, 0.0f, -2.0f));
 
 		// Enable extension required for conservative rasterization
-		enabledDeviceExtensions.push_back(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
 		// Reading device properties of conservative rasterization requires VK_KHR_get_physical_device_properties2 to be enabled
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	}
 
 	~VulkanExample()

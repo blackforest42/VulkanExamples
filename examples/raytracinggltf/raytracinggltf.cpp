@@ -70,8 +70,8 @@ public:
 		enabledFeatures_.shaderStorageImageReadWithoutFormat = VK_TRUE;
 		enabledFeatures_.shaderStorageImageWriteWithoutFormat = VK_TRUE;
 
-		enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
 	}
 
 	~VulkanExample()

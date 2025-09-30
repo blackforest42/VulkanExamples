@@ -61,7 +61,7 @@ VkResult VulkanExampleBase::createInstance() {
     if (vkEnumerateInstanceExtensionProperties(
             nullptr, &extCount, &extensions.front()) == VK_SUCCESS) {
       for (VkExtensionProperties& extension : extensions) {
-        supportedInstanceExtensions.push_back(extension.extensionName);
+        supportedInstanceExtensions_.push_back(extension.extensionName);
       }
     }
   }
@@ -81,12 +81,12 @@ VkResult VulkanExampleBase::createInstance() {
 #endif
 
   // Enabled requested instance extensions
-  if (!enabledInstanceExtensions.empty()) {
-    for (const char* enabledExtension : enabledInstanceExtensions) {
+  if (!enabledInstanceExtensions_.empty()) {
+    for (const char* enabledExtension : enabledInstanceExtensions_) {
       // Output message if requested extension is not available
-      if (std::find(supportedInstanceExtensions.begin(),
-                    supportedInstanceExtensions.end(),
-                    enabledExtension) == supportedInstanceExtensions.end()) {
+      if (std::find(supportedInstanceExtensions_.begin(),
+                    supportedInstanceExtensions_.end(),
+                    enabledExtension) == supportedInstanceExtensions_.end()) {
         std::cerr << "Enabled instance extension \"" << enabledExtension
                   << "\" is not present at instance level\n";
       }
@@ -101,10 +101,10 @@ VkResult VulkanExampleBase::createInstance() {
     if (apiVersion < VK_API_VERSION_1_1) {
       apiVersion = VK_API_VERSION_1_1;
     }
-    enabledDeviceExtensions.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
-    enabledDeviceExtensions.push_back(
+    enabledDeviceExtensions_.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+    enabledDeviceExtensions_.push_back(
         VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
-    enabledDeviceExtensions.push_back(
+    enabledDeviceExtensions_.push_back(
         VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
   }
 
@@ -142,10 +142,10 @@ VkResult VulkanExampleBase::createInstance() {
 
   // Enable the debug utils extension if available (e.g. when debugging tools
   // are present)
-  if (settings_.validation || std::find(supportedInstanceExtensions.begin(),
-                                        supportedInstanceExtensions.end(),
+  if (settings_.validation || std::find(supportedInstanceExtensions_.begin(),
+                                        supportedInstanceExtensions_.end(),
                                         VK_EXT_DEBUG_UTILS_EXTENSION_NAME) !=
-                                  supportedInstanceExtensions.end()) {
+                                  supportedInstanceExtensions_.end()) {
     instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
 
@@ -188,10 +188,10 @@ VkResult VulkanExampleBase::createInstance() {
   // MoltenVK on macOS and/or iOS.
   VkLayerSettingsCreateInfoEXT layerSettingsCreateInfo{
       .sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT};
-  if (enabledLayerSettings.size() > 0) {
+  if (enabledLayerSettings_.size() > 0) {
     layerSettingsCreateInfo.settingCount =
-        static_cast<uint32_t>(enabledLayerSettings.size());
-    layerSettingsCreateInfo.pSettings = enabledLayerSettings.data();
+        static_cast<uint32_t>(enabledLayerSettings_.size());
+    layerSettingsCreateInfo.pSettings = enabledLayerSettings_.data();
     layerSettingsCreateInfo.pNext = instanceCreateInfo.pNext;
     instanceCreateInfo.pNext = &layerSettingsCreateInfo;
   }
@@ -200,10 +200,10 @@ VkResult VulkanExampleBase::createInstance() {
 
   // If the debug utils extension is present we set up debug functions, so
   // samples can label objects for debugging
-  if (std::find(supportedInstanceExtensions.begin(),
-                supportedInstanceExtensions.end(),
+  if (std::find(supportedInstanceExtensions_.begin(),
+                supportedInstanceExtensions_.end(),
                 VK_EXT_DEBUG_UTILS_EXTENSION_NAME) !=
-      supportedInstanceExtensions.end()) {
+      supportedInstanceExtensions_.end()) {
     vks::debugutils::setup(instance_);
   }
 
@@ -316,7 +316,7 @@ void VulkanExampleBase::nextFrame() {
     }
   }
   float fpsTimer =
-      (float)(std::chrono::duration<double, std::milli>(tEnd - lastTimestamp)
+      (float)(std::chrono::duration<double, std::milli>(tEnd - lastTimestamp_)
                   .count());
   if (fpsTimer > 1000.0f) {
     lastFPS =
@@ -328,9 +328,9 @@ void VulkanExampleBase::nextFrame() {
     }
 #endif
     frameCounter_ = 0;
-    lastTimestamp = tEnd;
+    lastTimestamp_ = tEnd;
   }
-  tPrevEnd = tEnd;
+  tPrevEnd_ = tEnd;
 }
 
 void VulkanExampleBase::renderLoop() {
@@ -367,8 +367,8 @@ void VulkanExampleBase::renderLoop() {
 
   destWidth = width_;
   destHeight = height_;
-  lastTimestamp = std::chrono::high_resolution_clock::now();
-  tPrevEnd = lastTimestamp;
+  lastTimestamp_ = std::chrono::high_resolution_clock::now();
+  tPrevEnd_ = lastTimestamp_;
 #if defined(_WIN32)
   MSG msg;
   bool quitMessageReceived = false;
@@ -1104,7 +1104,8 @@ bool VulkanExampleBase::initVulkan() {
   // physical device (so that examples can check against them)
   vkGetPhysicalDeviceProperties(physicalDevice_, &deviceProperties_);
   vkGetPhysicalDeviceFeatures(physicalDevice_, &deviceFeatures_);
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice_, &deviceMemoryProperties);
+  vkGetPhysicalDeviceMemoryProperties(physicalDevice_,
+                                      &deviceMemoryProperties_);
 
   // Derived examples can override this to set actual features (based on above
   // readings) to enable for logical device creation
@@ -1120,7 +1121,7 @@ bool VulkanExampleBase::initVulkan() {
   getEnabledExtensions();
 
   result = vulkanDevice_->createLogicalDevice(
-      enabledFeatures_, enabledDeviceExtensions, deviceCreatepNextChain_);
+      enabledFeatures_, enabledDeviceExtensions_, deviceCreatepNextChain_);
   if (result != VK_SUCCESS) {
     vks::tools::exitFatal(
         "Could not create Vulkan device: \n" + vks::tools::errorString(result),

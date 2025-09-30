@@ -48,7 +48,7 @@ public:
 		camera_.setTranslation(glm::vec3(0.0f, 3.0f, -10.0f));
 		rayQueryOnly = true;
 		enableExtensions();
-		enabledDeviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
 	}
 
 	~VulkanExample()

@@ -54,7 +54,7 @@ public:
 		camera_.setTranslation(glm::vec3(0.0f, 3.0f, -10.0f));
 		enableExtensions();
 		// Enable the sample specific extension
-		enabledDeviceExtensions.push_back(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
 		// The corresponding GLSL extension is GL_EXT_ray_tracing_position_fetch
 	}
 

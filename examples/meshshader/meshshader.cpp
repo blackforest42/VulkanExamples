@@ -42,12 +42,12 @@ public:
 		apiVersion = VK_API_VERSION_1_1;
 
 		// Extensions required by mesh shading
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
 
 		// Required by VK_KHR_spirv_1_4
-		enabledDeviceExtensions.push_back(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
 
 		// We need to enable the mesh and task shader feature using a new struct introduced with the extension
 		enabledMeshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;

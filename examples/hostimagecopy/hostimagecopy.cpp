@@ -59,10 +59,10 @@ public:
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
 
 		// Enable required extensions
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
 
 		// Enable host image copy feature
 		enabledPhysicalDeviceHostImageCopyFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES_EXT;

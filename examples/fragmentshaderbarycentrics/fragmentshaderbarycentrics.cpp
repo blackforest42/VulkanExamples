@@ -39,10 +39,10 @@ public:
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
 		camera_.rotationSpeed = 0.25f;
 
-		enabledDeviceExtensions.push_back(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
 
 		// The extension requires other extensions to be enabled
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
 		// in addition to the extension, the feature needs to be explicitly enabled by chaining the extension structure into device creation
 		enabledFragmentShaderBarycentricFeaturesKHR.fragmentShaderBarycentric = VK_TRUE;

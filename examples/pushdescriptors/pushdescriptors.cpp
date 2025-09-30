@@ -52,8 +52,8 @@ public:
 		camera_.setRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 		camera_.setTranslation(glm::vec3(0.0f, 0.0f, -5.0f));
 		// Enable extension required for push descriptors
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-		enabledDeviceExtensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledDeviceExtensions_.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 	}
 
 	~VulkanExample()

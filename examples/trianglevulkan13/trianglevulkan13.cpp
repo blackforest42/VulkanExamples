@@ -159,9 +159,9 @@ public:
 	uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties)
 	{
 		// Iterate over all memory types available for the device used in this example
-		for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; i++) {
+		for (uint32_t i = 0; i < deviceMemoryProperties_.memoryTypeCount; i++) {
 			if ((typeBits & 1) == 1) {
-				if ((deviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+				if ((deviceMemoryProperties_.memoryTypes[i].propertyFlags & properties) == properties) {
 					return i;
 				}
 			}

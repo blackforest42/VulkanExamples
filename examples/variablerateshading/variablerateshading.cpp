@@ -18,9 +18,9 @@ VulkanExample::VulkanExample() : VulkanExampleBase()
 	camera_.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
 	camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
 	camera_.setRotationSpeed(0.25f);
-	enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-	enabledDeviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-	enabledDeviceExtensions.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+	enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+	enabledDeviceExtensions_.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+	enabledDeviceExtensions_.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
 }
 
 VulkanExample::~VulkanExample()

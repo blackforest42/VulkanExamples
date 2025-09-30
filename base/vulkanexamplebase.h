@@ -104,11 +104,11 @@ class VulkanExampleBase {
   // Frame counter to display fps
   uint32_t frameCounter_ = 0;
   uint32_t lastFPS = 0;
-  std::chrono::time_point<std::chrono::high_resolution_clock> lastTimestamp,
-      tPrevEnd;
+  std::chrono::time_point<std::chrono::high_resolution_clock> lastTimestamp_,
+      tPrevEnd_;
   // Vulkan instance, stores all per-application states
   VkInstance instance_{VK_NULL_HANDLE};
-  std::vector<std::string> supportedInstanceExtensions;
+  std::vector<std::string> supportedInstanceExtensions_;
   // Physical device (GPU) that Vulkan will use
   VkPhysicalDevice physicalDevice_{VK_NULL_HANDLE};
   // Stores physical device properties (for e.g. checking device limits)
@@ -117,19 +117,19 @@ class VulkanExampleBase {
   // checking if a feature is available)
   VkPhysicalDeviceFeatures deviceFeatures_{};
   // Stores all available memory (type) properties for the physical device
-  VkPhysicalDeviceMemoryProperties deviceMemoryProperties{};
+  VkPhysicalDeviceMemoryProperties deviceMemoryProperties_{};
   /** @brief Set of physical device features to be enabled for this example
    * (must be set in the derived constructor) */
   VkPhysicalDeviceFeatures enabledFeatures_{};
   /** @brief Set of device extensions to be enabled for this example (must be
    * set in the derived constructor) */
-  std::vector<const char*> enabledDeviceExtensions;
+  std::vector<const char*> enabledDeviceExtensions_;
   /** @brief Set of instance extensions to be enabled for this example (must be
    * set in the derived constructor) */
-  std::vector<const char*> enabledInstanceExtensions;
+  std::vector<const char*> enabledInstanceExtensions_;
   /** @brief Set of layer settings to be enabled for this example (must be set
    * in the derived constructor) */
-  std::vector<VkLayerSettingEXT> enabledLayerSettings;
+  std::vector<VkLayerSettingEXT> enabledLayerSettings_;
   /** @brief Optional pNext structure for passing extension structures to device
    * creation */
   void* deviceCreatepNextChain_ = nullptr;

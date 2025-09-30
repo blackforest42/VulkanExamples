@@ -79,7 +79,7 @@ public:
 		camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 256.0f);
 		
 		// Note: We enable the dynamic state extensions dynamically, based on which ones the device supports see getEnabledExtensions
-		enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+		enabledInstanceExtensions_.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	}
 
 	~VulkanExample()
@@ -118,12 +118,12 @@ public:
 
 		// Enable dynamic state extensions if present. This function is called after physical and before logical device creation, so we can enabled extensions based on a list of supported extensions
 		if (hasDynamicState) {
-			enabledDeviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+			enabledDeviceExtensions_.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
 			extendedDynamicStateFeaturesEXT.pNext = nullptr;
 			deviceCreatepNextChain_ = &extendedDynamicStateFeaturesEXT;
 		}
 		if (hasDynamicState2) {
-			enabledDeviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+			enabledDeviceExtensions_.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
 			extendedDynamicState2FeaturesEXT.pNext = nullptr;
 			if (hasDynamicState) {
 				extendedDynamicStateFeaturesEXT.pNext = &extendedDynamicState2FeaturesEXT;
@@ -133,7 +133,7 @@ public:
 			}
 		}
 		if (hasDynamicState3) {
-			enabledDeviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+			enabledDeviceExtensions_.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
 			if (hasDynamicState2) {
 				extendedDynamicState2FeaturesEXT.pNext = &extendedDynamicState3FeaturesEXT;
 			}
@@ -143,7 +143,7 @@ public:
 
 		}
 		if (hasDynamicVertexState) {
-			enabledDeviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+			enabledDeviceExtensions_.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
 		}
 	}
 

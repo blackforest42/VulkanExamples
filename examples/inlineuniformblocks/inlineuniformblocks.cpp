@@ -76,10 +76,10 @@ class VulkanExample : public VulkanExampleBase {
     /*
             [POI] Enable extensions required for inline uniform blocks
     */
-    enabledDeviceExtensions.push_back(
+    enabledDeviceExtensions_.push_back(
         VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
-    enabledDeviceExtensions.push_back(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
-    enabledInstanceExtensions.push_back(
+    enabledDeviceExtensions_.push_back(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
+    enabledInstanceExtensions_.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
     /*
