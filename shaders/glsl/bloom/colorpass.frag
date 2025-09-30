@@ -12,7 +12,7 @@ bool tonemap = true;
 void main() 
 {
 	if (tonemap) {
-		float exposure = .1f;
+		float exposure = 1.0f;
 		vec3 fragColor = inColor;
 		fragColor = vec3(1.0) - exp(-fragColor * exposure);
 

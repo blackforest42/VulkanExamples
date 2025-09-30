@@ -17,7 +17,7 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  bool bloom_ = false;
+  bool bloom_ = true;
 
   vks::TextureCubeMap cubemap_;
 
@@ -726,7 +726,6 @@ class VulkanExample : public VulkanExampleBase {
               First render pass: Render glow parts of the model (separate mesh)
          to an offscreen frame buffer
       */
-
       vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
@@ -747,7 +746,6 @@ class VulkanExample : public VulkanExampleBase {
          apply a vertical blur This is the first blur pass, the horizontal blur
          is applied when rendering on top of the scene
       */
-
       renderPassBeginInfo.framebuffer =
           offscreenPass_.framebuffers[1].framebuffer;
 
