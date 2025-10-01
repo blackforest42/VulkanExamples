@@ -23,7 +23,7 @@ public:
 		uint32_t width{ 0 };
 		uint32_t height{ 0 };
 		uint32_t mipLevels{ 0 };
-	} texture;
+	} texture_;
 
 	// To demonstrate mip mapping and filtering this example uses separate samplers
 	std::vector<std::string> samplerNames{ "No mip maps" , "Mip maps (bilinear)" , "Mip maps (anisotropic)" };
@@ -61,7 +61,7 @@ public:
 	~VulkanExample()
 	{
 		if (device_) {
-			destroyTextureImage(texture);
+			destroyTextureImage(texture_);
 			vkDestroyPipeline(device_, pipeline, nullptr);
 			vkDestroyPipelineLayout(device_, pipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(device_, descriptorSetLayout, nullptr);
@@ -110,15 +110,15 @@ public:
 #endif
 		assert(result == KTX_SUCCESS);
 
-		texture.width = ktxTexture->baseWidth;
-		texture.height = ktxTexture->baseHeight;
+		texture_.width = ktxTexture->baseWidth;
+		texture_.height = ktxTexture->baseHeight;
 		ktx_uint8_t *ktxTextureData = ktxTexture_GetData(ktxTexture);
 		ktx_size_t ktxTextureSize = ktxTexture_GetImageSize(ktxTexture, 0);
 
 		// calculate num of mip maps
 		// numLevels = 1 + floor(log2(max(w, h, d)))
 		// Calculated as log2(max(width, height, depth))c + 1 (see specs)
-		texture.mipLevels = static_cast<uint32_t>(floor(log2(std::max(texture.width, texture.height))) + 1);
+		texture_.mipLevels = static_cast<uint32_t>(floor(log2(std::max(texture_.width, texture_.height))) + 1);
 
 		// Get device properties for the requested texture format
 		VkFormatProperties formatProperties;
@@ -156,20 +156,20 @@ public:
 		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = format;
-		imageCreateInfo.mipLevels = texture.mipLevels;
+		imageCreateInfo.mipLevels = texture_.mipLevels;
 		imageCreateInfo.arrayLayers = 1;
 		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageCreateInfo.extent = { texture.width, texture.height, 1 };
+		imageCreateInfo.extent = { texture_.width, texture_.height, 1 };
 		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture.image));
-		vkGetImageMemoryRequirements(device_, texture.image, &memReqs);
+		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture_.image));
+		vkGetImageMemoryRequirements(device_, texture_.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device_, texture.image, texture.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture_.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(device_, texture_.image, texture_.deviceMemory, 0));
 
 		VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
@@ -181,7 +181,7 @@ public:
 		// Optimal image will be used as destination for the copy, so we must transfer from our initial undefined image layout to the transfer destination layout
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
-			texture.image,
+			texture_.image,
 			0,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_IMAGE_LAYOUT_UNDEFINED,
@@ -196,16 +196,16 @@ public:
 		bufferCopyRegion.imageSubresource.mipLevel = 0;
 		bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
 		bufferCopyRegion.imageSubresource.layerCount = 1;
-		bufferCopyRegion.imageExtent.width = texture.width;
-		bufferCopyRegion.imageExtent.height = texture.height;
+		bufferCopyRegion.imageExtent.width = texture_.width;
+		bufferCopyRegion.imageExtent.height = texture_.height;
 		bufferCopyRegion.imageExtent.depth = 1;
 
-		vkCmdCopyBufferToImage(copyCmd, stagingBuffer, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
+		vkCmdCopyBufferToImage(copyCmd, stagingBuffer, texture_.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
 
 		// Transition first mip level to transfer source for read during blit
 		vks::tools::insertImageMemoryBarrier(
 			copyCmd,
-			texture.image,
+			texture_.image,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_ACCESS_TRANSFER_READ_BIT,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -228,7 +228,7 @@ public:
 		VkCommandBuffer blitCmd = vulkanDevice_->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Copy down mips from n-1 to n
-		for (uint32_t i = 1; i < texture.mipLevels; i++)
+		for (uint32_t i = 1; i < texture_.mipLevels; i++)
 		{
 			VkImageBlit imageBlit{};
 
@@ -236,16 +236,16 @@ public:
 			imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			imageBlit.srcSubresource.layerCount = 1;
 			imageBlit.srcSubresource.mipLevel = i-1;
-			imageBlit.srcOffsets[1].x = int32_t(texture.width >> (i - 1));
-			imageBlit.srcOffsets[1].y = int32_t(texture.height >> (i - 1));
+			imageBlit.srcOffsets[1].x = int32_t(texture_.width >> (i - 1));
+			imageBlit.srcOffsets[1].y = int32_t(texture_.height >> (i - 1));
 			imageBlit.srcOffsets[1].z = 1;
 
 			// Destination
 			imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			imageBlit.dstSubresource.layerCount = 1;
 			imageBlit.dstSubresource.mipLevel = i;
-			imageBlit.dstOffsets[1].x = int32_t(texture.width >> i);
-			imageBlit.dstOffsets[1].y = int32_t(texture.height >> i);
+			imageBlit.dstOffsets[1].x = int32_t(texture_.width >> i);
+			imageBlit.dstOffsets[1].y = int32_t(texture_.height >> i);
 			imageBlit.dstOffsets[1].z = 1;
 
 			VkImageSubresourceRange mipSubRange = {};
@@ -257,7 +257,7 @@ public:
 			// Prepare current mip level as image blit destination
 			vks::tools::insertImageMemoryBarrier(
 				blitCmd,
-				texture.image,
+				texture_.image,
 				0,
 				VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED,
@@ -269,9 +269,9 @@ public:
 			// Blit from previous level
 			vkCmdBlitImage(
 				blitCmd,
-				texture.image,
+				texture_.image,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				texture.image,
+				texture_.image,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				1,
 				&imageBlit,
@@ -280,7 +280,7 @@ public:
 			// Prepare current mip level as image blit source for next level
 			vks::tools::insertImageMemoryBarrier(
 				blitCmd,
-				texture.image,
+				texture_.image,
 				VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_ACCESS_TRANSFER_READ_BIT,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -291,10 +291,10 @@ public:
 		}
 
 		// After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
-		subresourceRange.levelCount = texture.mipLevels;
+		subresourceRange.levelCount = texture_.mipLevels;
 		vks::tools::insertImageMemoryBarrier(
 			blitCmd,
-			texture.image,
+			texture_.image,
 			VK_ACCESS_TRANSFER_READ_BIT,
 			VK_ACCESS_SHADER_READ_BIT,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -328,7 +328,7 @@ public:
 		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &samplers[0]));
 
 		// With mip mapping
-		sampler.maxLod = (float)texture.mipLevels;
+		sampler.maxLod = (float)texture_.mipLevels;
 		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &samplers[1]));
 
 		// With mip mapping and anisotropic filtering
@@ -341,15 +341,15 @@ public:
 
 		// Create image view
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
-		view.image = texture.image;
+		view.image = texture_.image;
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		view.format = format;
 		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		view.subresourceRange.baseMipLevel = 0;
 		view.subresourceRange.baseArrayLayer = 0;
 		view.subresourceRange.layerCount = 1;
-		view.subresourceRange.levelCount = texture.mipLevels;
-		VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr, &texture.view));
+		view.subresourceRange.levelCount = texture_.mipLevels;
+		VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr, &texture_.view));
 	}
 
 	// Free all Vulkan resources used a texture object
@@ -389,7 +389,7 @@ public:
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device_, &descriptorLayout, nullptr, &descriptorSetLayout));
 
-		VkDescriptorImageInfo textureDescriptor = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, texture.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VkDescriptorImageInfo textureDescriptor = vks::initializers::descriptorImageInfo(VK_NULL_HANDLE, texture_.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// Sets per frame, just like the buffers themselves
 		// Images and samplers do not need to be duplicated per frame, we reuse the same one for each frame
@@ -539,7 +539,7 @@ public:
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)
 	{
 		if (overlay->header("Settings")) {
-			if (overlay->sliderFloat("LOD bias", &uniformData_.lodBias, 0.0f, (float)texture.mipLevels)) {
+			if (overlay->sliderFloat("LOD bias", &uniformData_.lodBias, 0.0f, (float)texture_.mipLevels)) {
 				updateUniformBuffers();
 			}
 			if (overlay->comboBox("Sampler type", &uniformData_.samplerIndex, samplerNames)) {

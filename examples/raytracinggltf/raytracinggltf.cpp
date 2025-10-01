@@ -36,7 +36,7 @@ public:
 		ShaderBindingTable hit;
 	} shaderBindingTables;
 
-	vks::Texture2D texture;
+	vks::Texture2D texture_;
 
 	struct UniformData {
 		glm::mat4 viewInverse;

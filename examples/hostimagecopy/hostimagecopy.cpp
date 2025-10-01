@@ -33,7 +33,7 @@ public:
 		uint32_t width{ 0 };
 		uint32_t height{ 0 };
 		uint32_t mipLevels{ 0 };
-	} texture;
+	} texture_;
 
 	vkglTF::Model plane;
 
@@ -73,7 +73,7 @@ public:
 	~VulkanExample() override
 	{
 		if (device_) {
-			destroyTextureImage(texture);
+			destroyTextureImage(texture_);
 			vkDestroyPipeline(device_, pipeline, nullptr);
 			vkDestroyPipelineLayout(device_, pipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(device_, descriptorSetLayout, nullptr);
@@ -132,9 +132,9 @@ public:
 		assert(result == KTX_SUCCESS);
 
 		// Get properties required for using and upload texture data from the ktx texture object
-		texture.width = ktxTexture->baseWidth;
-		texture.height = ktxTexture->baseHeight;
-		texture.mipLevels = ktxTexture->numLevels;
+		texture_.width = ktxTexture->baseWidth;
+		texture_.height = ktxTexture->baseHeight;
+		texture_.mipLevels = ktxTexture->numLevels;
 		ktx_uint8_t *ktxTextureData = ktxTexture_GetData(ktxTexture);
 
 		const VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
@@ -159,24 +159,24 @@ public:
 		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = imageFormat;
-		imageCreateInfo.mipLevels = texture.mipLevels;
+		imageCreateInfo.mipLevels = texture_.mipLevels;
 		imageCreateInfo.arrayLayers = 1;
 		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageCreateInfo.extent = { texture.width, texture.height, 1 };
+		imageCreateInfo.extent = { texture_.width, texture_.height, 1 };
 		// For images that use host image copy we need to specify the VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT usage flag
 		imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT;
-		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture.image));
+		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture_.image));
 
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs = {};
-		vkGetImageMemoryRequirements(device_, texture.image, &memReqs);
+		vkGetImageMemoryRequirements(device_, texture_.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device_, texture.image, texture.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture_.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(device_, texture_.image, texture_.deviceMemory, 0));
 
 		// With host image copy we can directly copy from the KTX image in host memory to the device
 		// This is pretty straight forward, as the KTX image is already tightly packed, doesn't need and swizzle and as such matches
@@ -184,7 +184,7 @@ public:
 
 		// Set up copy information for all mip levels stored in the image
 		std::vector<VkMemoryToImageCopyEXT> memoryToImageCopies{};
-		for (uint32_t i = 0; i < texture.mipLevels; i++) {
+		for (uint32_t i = 0; i < texture_.mipLevels; i++) {
 			// Setup a buffer image copy structure for the current mip level
 			VkMemoryToImageCopyEXT memoryToImageCopy = {};
 			memoryToImageCopy.sType = VK_STRUCTURE_TYPE_MEMORY_TO_IMAGE_COPY_EXT;
@@ -209,7 +209,7 @@ public:
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		subresourceRange.baseMipLevel = 0;
-		subresourceRange.levelCount = texture.mipLevels;
+		subresourceRange.levelCount = texture_.mipLevels;
 		subresourceRange.layerCount = 1;
 
 		// VK_EXT_host_image_copy als introduces a simplified way of doing the required image transition on the host
@@ -217,7 +217,7 @@ public:
 		// We also no longer need multiple transitions, and only have to do one for the final layout
 		VkHostImageLayoutTransitionInfoEXT hostImageLayoutTransitionInfo{};
 		hostImageLayoutTransitionInfo.sType = VK_STRUCTURE_TYPE_HOST_IMAGE_LAYOUT_TRANSITION_INFO_EXT;
-		hostImageLayoutTransitionInfo.image = texture.image;
+		hostImageLayoutTransitionInfo.image = texture_.image;
 		hostImageLayoutTransitionInfo.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		hostImageLayoutTransitionInfo.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		hostImageLayoutTransitionInfo.subresourceRange = subresourceRange;
@@ -228,7 +228,7 @@ public:
 		// The implementation will then convert this to an implementation specific optimal tiling layout
 		VkCopyMemoryToImageInfoEXT copyMemoryInfo{};
 		copyMemoryInfo.sType = VK_STRUCTURE_TYPE_COPY_MEMORY_TO_IMAGE_INFO_EXT;
-		copyMemoryInfo.dstImage = texture.image;
+		copyMemoryInfo.dstImage = texture_.image;
 		copyMemoryInfo.dstImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		copyMemoryInfo.regionCount = static_cast<uint32_t>(memoryToImageCopies.size());
 		copyMemoryInfo.pRegions = memoryToImageCopies.data();
@@ -248,19 +248,19 @@ public:
 		sampler.mipLodBias = 0.0f;
 		sampler.compareOp = VK_COMPARE_OP_NEVER;
 		sampler.minLod = 0.0f;
-		sampler.maxLod = (float)texture.mipLevels;
+		sampler.maxLod = (float)texture_.mipLevels;
 		sampler.maxAnisotropy = vulkanDevice_->properties.limits.maxSamplerAnisotropy;
 		sampler.anisotropyEnable = VK_TRUE;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &texture.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &texture_.sampler));
 
 		// Create image view
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		view.format = imageFormat;
 		view.subresourceRange = subresourceRange;
-		view.image = texture.image;
-		VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr, &texture.view));
+		view.image = texture_.image;
+		VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr, &texture_.view));
 	}
 
 	// Free all Vulkan resources used by a texture object
@@ -297,8 +297,8 @@ public:
 
 		// Setup a descriptor image info for the current texture to be used as a combined image sampler
 		VkDescriptorImageInfo textureDescriptor{};
-		textureDescriptor.imageView = texture.view;
-		textureDescriptor.sampler = texture.sampler;
+		textureDescriptor.imageView = texture_.view;
+		textureDescriptor.sampler = texture_.sampler;
 		textureDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		VkDescriptorSetAllocateInfo allocInfo = vks::initializers::descriptorSetAllocateInfo(descriptorPool_, &descriptorSetLayout, 1);
@@ -445,7 +445,7 @@ public:
 	void OnUpdateUIOverlay(vks::UIOverlay *overlay) override
 	{
 		if (overlay->header("Settings")) {
-			overlay->sliderFloat("LOD bias", &uniformData_.lodBias, 0.0f, (float)texture.mipLevels);
+			overlay->sliderFloat("LOD bias", &uniformData_.lodBias, 0.0f, (float)texture_.mipLevels);
 		}
 	}
 };

@@ -36,7 +36,7 @@ public:
 		ShaderBindingTable hit;
 	} shaderBindingTables;
 
-	vks::Texture2D texture;
+	vks::Texture2D texture_;
 
 	struct UniformData {
 		glm::mat4 viewInverse;
@@ -75,7 +75,7 @@ public:
 		shaderBindingTables.raygen.destroy();
 		shaderBindingTables.miss.destroy();
 		shaderBindingTables.hit.destroy();
-		texture.destroy();
+		texture_.destroy();
 		for (auto& buffer : uniformBuffers_) {
 			buffer.destroy();
 		}
@@ -434,7 +434,7 @@ public:
 				// Binding 2: Uniform data
 				vks::initializers::writeDescriptorSet(descriptorSets_[i], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, &uniformBuffers_[i].descriptor),
 				// Binding 3: Texture image
-				vks::initializers::writeDescriptorSet(descriptorSets_[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texture.descriptor),
+				vks::initializers::writeDescriptorSet(descriptorSets_[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texture_.descriptor),
 			};
 			vkUpdateDescriptorSets(device_, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
 		}
@@ -583,7 +583,7 @@ public:
 
 	void loadAssets()
 	{
-		texture.loadFromFile(getAssetPath() + "textures/gratefloor_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		texture_.loadFromFile(getAssetPath() + "textures/gratefloor_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	void prepare()

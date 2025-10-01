@@ -75,7 +75,7 @@ public:
 		uint32_t mipLevels;
 		uint32_t layerCount;
         VkImageSubresourceRange subRange;
-	} texture;
+	} texture_;
 
 	vkglTF::Model plane;
 

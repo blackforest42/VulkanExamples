@@ -1,9 +1,22 @@
 #version 450
 
+// in
+
 // out
 layout (location = 0) out vec4 outFragColor;
 
-// layout (binding = 1) uniform samplerCube samplerCubeMap;
+layout (binding = 2) uniform UBO
+{
+float mouseX;
+float mouseY;
+// time elapsed in seconds
+float time;
+vec2 resolution;
+bool mouseControl;
+} ubo;
+
+layout (binding = 3) uniform samplerCube galaxy_skybox;
+layout (binding = 4) uniform sampler2D colorMap;
 
 const float PI = 3.14159265359;
 const float EPSILON = 0.0001;
@@ -15,7 +28,6 @@ const float cameraRoll = 0.0;
 
 const float gravatationalLensing = 1.0;
 const float renderBlackHole = 1.0;
-const float mouseControl = 1.0;
 const float fovScale = 1.0;
 
 const float AccDiskEnabled = 1.0;

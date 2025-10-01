@@ -24,6 +24,7 @@ class VulkanExample : public VulkanExampleBase {
   bool enableBlackhole_ = true;
 
   vks::Texture cubeMap_{};
+  vks::Texture colorMap_{};
 
   struct Models {
     vkglTF::Model skybox;
@@ -135,7 +136,24 @@ class VulkanExample : public VulkanExampleBase {
         // Binding 1 : Fragment shader image sampler
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1)};
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1),
+
+        // Binding 2 : Fragment shader blackhole uniform buffer
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 2),
+
+        // Binding 3 : Fragment shader blackhole 3D cubemap
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 3),
+
+        // Binding 4 : Fragment shader blackhole 2D texture
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 4)};
 
     VkDescriptorSetLayoutCreateInfo descriptorLayout =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);

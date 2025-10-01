@@ -137,7 +137,7 @@ public:
 		uint32_t height{ 0 };
 		uint32_t depth{ 0 };
 		uint32_t mipLevels{ 0 };
-	} texture;
+	} texture_;
 
 	vks::Buffer vertexBuffer;
 	vks::Buffer indexBuffer;
@@ -171,7 +171,7 @@ public:
 	~VulkanExample()
 	{
 		if (device_) {
-			destroyTextureImage(texture);
+			destroyTextureImage(texture_);
 			vkDestroyPipeline(device_, pipeline, nullptr);
 			vkDestroyPipelineLayout(device_, pipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(device_, descriptorSetLayout, nullptr);
@@ -188,16 +188,16 @@ public:
 	void prepareNoiseTexture(uint32_t width, uint32_t height, uint32_t depth)
 	{
 		// A 3D texture is described as width x height x depth
-		texture.width = width;
-		texture.height = height;
-		texture.depth = depth;
-		texture.mipLevels = 1;
-		texture.format = VK_FORMAT_R8_UNORM;
+		texture_.width = width;
+		texture_.height = height;
+		texture_.depth = depth;
+		texture_.mipLevels = 1;
+		texture_.format = VK_FORMAT_R8_UNORM;
 
 		// Format support check
 		// 3D texture support in Vulkan is mandatory (in contrast to OpenGL) so no need to check if it's supported
 		VkFormatProperties formatProperties;
-		vkGetPhysicalDeviceFormatProperties(physicalDevice_, texture.format, &formatProperties);
+		vkGetPhysicalDeviceFormatProperties(physicalDevice_, texture_.format, &formatProperties);
 		// Check if format supports transfer
 		if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
 		{
@@ -215,28 +215,28 @@ public:
 		// Create optimal tiled target image
 		VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_3D;
-		imageCreateInfo.format = texture.format;
-		imageCreateInfo.mipLevels = texture.mipLevels;
+		imageCreateInfo.format = texture_.format;
+		imageCreateInfo.mipLevels = texture_.mipLevels;
 		imageCreateInfo.arrayLayers = 1;
 		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageCreateInfo.extent.width = texture.width;
-		imageCreateInfo.extent.height = texture.height;
-		imageCreateInfo.extent.depth = texture.depth;
+		imageCreateInfo.extent.width = texture_.width;
+		imageCreateInfo.extent.height = texture_.height;
+		imageCreateInfo.extent.depth = texture_.depth;
 		// Set initial layout of the image to undefined
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture.image));
+		VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr, &texture_.image));
 
 		// Device local memory to back up image
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs = {};
-		vkGetImageMemoryRequirements(device_, texture.image, &memReqs);
+		vkGetImageMemoryRequirements(device_, texture_.image, &memReqs);
 		memAllocInfo.allocationSize = memReqs.size;
 		memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture.deviceMemory));
-		VK_CHECK_RESULT(vkBindImageMemory(device_, texture.image, texture.deviceMemory, 0));
+		VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr, &texture_.deviceMemory));
+		VK_CHECK_RESULT(vkBindImageMemory(device_, texture_.image, texture_.deviceMemory, 0));
 
 		// Create sampler
 		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
@@ -253,24 +253,24 @@ public:
 		sampler.maxAnisotropy = 1.0;
 		sampler.anisotropyEnable = VK_FALSE;
 		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &texture.sampler));
+		VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr, &texture_.sampler));
 
 		// Create image view
 		VkImageViewCreateInfo view = vks::initializers::imageViewCreateInfo();
-		view.image = texture.image;
+		view.image = texture_.image;
 		view.viewType = VK_IMAGE_VIEW_TYPE_3D;
-		view.format = texture.format;
+		view.format = texture_.format;
 		view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		view.subresourceRange.baseMipLevel = 0;
 		view.subresourceRange.baseArrayLayer = 0;
 		view.subresourceRange.layerCount = 1;
 		view.subresourceRange.levelCount = 1;
-		VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr, &texture.view));
+		VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr, &texture_.view));
 
 		// Fill image descriptor image info to be used descriptor set setup
-		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		texture.descriptor.imageView = texture.view;
-		texture.descriptor.sampler = texture.sampler;
+		texture_.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		texture_.descriptor.imageView = texture_.view;
+		texture_.descriptor.sampler = texture_.sampler;
 
 		updateNoiseTexture();
 	}
@@ -278,13 +278,13 @@ public:
 	// Generate randomized noise and upload it to the 3D texture using staging
 	void updateNoiseTexture()
 	{
-		const uint32_t texMemSize = texture.width * texture.height * texture.depth;
+		const uint32_t texMemSize = texture_.width * texture_.height * texture_.depth;
 
 		uint8_t *data = new uint8_t[texMemSize];
 		memset(data, 0, texMemSize);
 
 		// Generate perlin based noise
-		std::cout << "Generating " << texture.width << " x " << texture.height << " x " << texture.depth << " noise texture..." << std::endl;
+		std::cout << "Generating " << texture_.width << " x " << texture_.height << " x " << texture_.depth << " noise texture..." << std::endl;
 
 		auto tStart = std::chrono::high_resolution_clock::now();
 
@@ -294,18 +294,18 @@ public:
 		const float noiseScale = static_cast<float>(rand() % 10) + 4.0f;
 
 #pragma omp parallel for
-		for (int32_t z = 0; z < static_cast<int32_t>(texture.depth); z++)
+		for (int32_t z = 0; z < static_cast<int32_t>(texture_.depth); z++)
 		{
-			for (int32_t y = 0; y < static_cast<int32_t>(texture.height); y++)
+			for (int32_t y = 0; y < static_cast<int32_t>(texture_.height); y++)
 			{
-				for (int32_t x = 0; x < static_cast<int32_t>(texture.width); x++)
+				for (int32_t x = 0; x < static_cast<int32_t>(texture_.width); x++)
 				{
-					float nx = (float)x / (float)texture.width;
-					float ny = (float)y / (float)texture.height;
-					float nz = (float)z / (float)texture.depth;
+					float nx = (float)x / (float)texture_.width;
+					float ny = (float)y / (float)texture_.height;
+					float nz = (float)z / (float)texture_.depth;
 					float n = fractalNoise.noise(nx * noiseScale, ny * noiseScale, nz * noiseScale);
 					n = n - floor(n);
-					data[x + y * texture.width + z * texture.width * texture.height] = static_cast<uint8_t>(floor(n * 255));
+					data[x + y * texture_.width + z * texture_.width * texture_.height] = static_cast<uint8_t>(floor(n * 255));
 				}
 			}
 		}
@@ -354,7 +354,7 @@ public:
 		// initial undefined image layout to the transfer destination layout
 		vks::tools::setImageLayout(
 			copyCmd,
-			texture.image,
+			texture_.image,
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			subresourceRange);
@@ -367,25 +367,25 @@ public:
 		bufferCopyRegion.imageSubresource.mipLevel = 0;
 		bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
 		bufferCopyRegion.imageSubresource.layerCount = 1;
-		bufferCopyRegion.imageExtent.width = texture.width;
-		bufferCopyRegion.imageExtent.height = texture.height;
-		bufferCopyRegion.imageExtent.depth = texture.depth;
+		bufferCopyRegion.imageExtent.width = texture_.width;
+		bufferCopyRegion.imageExtent.height = texture_.height;
+		bufferCopyRegion.imageExtent.depth = texture_.depth;
 
 		vkCmdCopyBufferToImage(
 			copyCmd,
 			stagingBuffer,
-			texture.image,
+			texture_.image,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			1,
 			&bufferCopyRegion);
 
 		// Change texture image layout to shader read after all mip levels have been copied
-		texture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		texture_.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		vks::tools::setImageLayout(
 			copyCmd,
-			texture.image,
+			texture_.image,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			texture.imageLayout,
+			texture_.imageLayout,
 			subresourceRange);
 
 		vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
@@ -470,7 +470,7 @@ public:
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device_, &descriptorLayout, nullptr, &descriptorSetLayout));
 
 		// Image descriptor for the 3D texture
-		VkDescriptorImageInfo textureDescriptor = vks::initializers::descriptorImageInfo(texture.sampler, texture.view, texture.imageLayout);
+		VkDescriptorImageInfo textureDescriptor = vks::initializers::descriptorImageInfo(texture_.sampler, texture_.view, texture_.imageLayout);
 
 		// Sets per frame, just like the buffers themselves
 		// Images do not need to be duplicated per frame, we reuse the same one for each frame

@@ -26,7 +26,7 @@ public:
 	};
 	std::array<Cube, 2> cubes{};
 
-	vks::Texture2D texture;
+	vks::Texture2D texture_;
 	vkglTF::Model model;
 
 	// Global matrices
@@ -77,7 +77,7 @@ public:
 			vkDestroyPipeline(device_, pipeline, nullptr);
 			vkDestroyPipelineLayout(device_, pipelineLayout, nullptr);
 			vkDestroyDescriptorSetLayout(device_, descriptorSetLayout, nullptr);
-			texture.destroy();
+			texture_.destroy();
 			for (auto& cube : cubes) {
 				for (auto& buffer : cube.buffers) {
 					buffer.destroy();
@@ -100,7 +100,7 @@ public:
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
 		model.loadFromFile(getAssetPath() + "models/cube.gltf", vulkanDevice_, queue_, glTFLoadingFlags);
-		texture.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+		texture_.loadFromFile(getAssetPath() + "textures/crate01_color_height_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
 	}
 
 	// We pass all data via buffer device addresses, so we only allocate descriptors for the images
@@ -125,7 +125,7 @@ public:
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo, &descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &texture.descriptor)
+			vks::initializers::writeDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &texture_.descriptor)
 		};
 		vkUpdateDescriptorSets(device_, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 	}
