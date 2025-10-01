@@ -1,3 +1,2 @@
 Sept 30
-	- working screen quad render with vert and frag shader!!!
 	- still need to port uniforms and ogl blackhole frag shader code

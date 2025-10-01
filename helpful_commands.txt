@@ -1,5 +1,8 @@
 # Compile shaders
-glsl.c shader.vert -o shader.vert.spv
+glslc blackhole_main.vert -o blackhole_main.vert.spv
+
+glslc blackhole_main.frag -o blackhole_main.frag.spv
+
 
 # Use `toktx` to create a .ktx cubemap from 6 .png files
 toktx --target_type RGBA --cubemap  cubemap.ktx  .\left.png .\right.png .\top.png .\bottom.png .\back.png .\front.png 

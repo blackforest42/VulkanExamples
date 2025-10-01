@@ -21,7 +21,7 @@
 class VulkanExample : public VulkanExampleBase {
  public:
   bool displaySkybox_ = true;
-  bool enableBlackhole_ = false;
+  bool enableBlackhole_ = true;
 
   vks::Texture cubeMap_{};
 
