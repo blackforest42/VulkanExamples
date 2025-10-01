@@ -42,6 +42,7 @@ class VulkanExample : public VulkanExampleBase {
   struct {
     VkPipeline skybox{VK_NULL_HANDLE};
     VkPipeline reflect{VK_NULL_HANDLE};
+    VkPipeline blackhole{VK_NULL_HANDLE};
   } pipelines_;
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};
@@ -234,6 +235,21 @@ class VulkanExample : public VulkanExampleBase {
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.reflect));
+
+    // Blackhole pipeline
+    shaderStages[0] =
+        loadShader(getShadersPath() + "blackhole/blackhole_main.vert.spv",
+                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] =
+        loadShader(getShadersPath() + "blackhole/blackhole_main.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    // Enable depth test and write
+    depthStencilState.depthWriteEnable = VK_TRUE;
+    depthStencilState.depthTestEnable = VK_TRUE;
+    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.blackhole));
   }
 
   // (B) Called in VulkanExampleBase::renderLoop()
