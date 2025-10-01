@@ -21,6 +21,7 @@
 class VulkanExample : public VulkanExampleBase {
  public:
   bool displaySkybox_ = true;
+  bool enableBlackhole_ = false;
 
   vks::Texture cubeMap_{};
 
@@ -47,7 +48,12 @@ class VulkanExample : public VulkanExampleBase {
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};
   VkDescriptorSetLayout descriptorSetLayout_{VK_NULL_HANDLE};
-  std::array<VkDescriptorSet, MAX_CONCURRENT_FRAMES> descriptorSets_{};
+
+  struct DescriptorSets {
+    VkDescriptorSet spaceship{VK_NULL_HANDLE};
+    VkDescriptorSet blackhole{VK_NULL_HANDLE};
+  };
+  std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
 
   std::vector<std::string> objectNames_;
 
@@ -148,15 +154,15 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::descriptorSetAllocateInfo(descriptorPool_,
                                                      &descriptorSetLayout_, 1);
     for (auto i = 0; i < uniformBuffers_.size(); i++) {
-      VK_CHECK_RESULT(
-          vkAllocateDescriptorSets(device_, &allocInfo, &descriptorSets_[i]));
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].spaceship));
       std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-              &uniformBuffers_[i].descriptor),
+              descriptorSets_[i].spaceship, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              0, &uniformBuffers_[i].descriptor),
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
-              &textureDescriptor),
+              descriptorSets_[i].spaceship,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -243,9 +249,6 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/blackhole_main.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
-    // Enable depth test and write
-    depthStencilState.depthWriteEnable = VK_TRUE;
-    depthStencilState.depthTestEnable = VK_TRUE;
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
@@ -279,53 +282,94 @@ class VulkanExample : public VulkanExampleBase {
 
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();
-
-    VkClearValue clearValues[2]{};
-    clearValues[0].color = defaultClearColor;
-    clearValues[1].depthStencil = {1.0f, 0};
-
-    VkRenderPassBeginInfo renderPassBeginInfo =
-        vks::initializers::renderPassBeginInfo();
-    renderPassBeginInfo.renderPass = renderPass_;
-    renderPassBeginInfo.renderArea.offset.x = 0;
-    renderPassBeginInfo.renderArea.offset.y = 0;
-    renderPassBeginInfo.renderArea.extent.width = width_;
-    renderPassBeginInfo.renderArea.extent.height = height_;
-    renderPassBeginInfo.clearValueCount = 2;
-    renderPassBeginInfo.pClearValues = clearValues;
-    renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
-
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
 
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
+    if (enableBlackhole_) {
+      /*
+              Render scene to offscreen framebuffer
+      */
 
-    VkViewport viewport =
-        vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
-    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+      std::array<VkClearValue, 2> clearValues{};
+      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[1].depthStencil = {1.0f, 0};
 
-    VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
-    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+      VkRenderPassBeginInfo renderPassBeginInfo =
+          vks::initializers::renderPassBeginInfo();
+      renderPassBeginInfo.renderPass = renderPass_;
+      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+      renderPassBeginInfo.renderArea.offset.x = 0;
+      renderPassBeginInfo.renderArea.offset.y = 0;
+      renderPassBeginInfo.renderArea.extent.width = width_;
+      renderPassBeginInfo.renderArea.extent.height = height_;
+      renderPassBeginInfo.clearValueCount = 2;
+      renderPassBeginInfo.pClearValues = clearValues.data();
 
-    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout_, 0, 1,
-                            &descriptorSets_[currentBuffer_], 0, nullptr);
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
 
-    // Skybox
-    if (displaySkybox_) {
+      VkViewport viewport = vks::initializers::viewport(
+          (float)width_, (float)height_, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+      VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
+          &descriptorSets_[currentBuffer_].blackhole, 0, nullptr);
+
       vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        pipelines_.skybox);
-      models_.skybox.draw(cmdBuffer);
+                        pipelines_.blackhole);
+      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+      vkCmdEndRenderPass(cmdBuffer);
+
+    } else {
+      VkClearValue clearValues[2]{};
+      clearValues[0].color = defaultClearColor;
+      clearValues[1].depthStencil = {1.0f, 0};
+
+      VkRenderPassBeginInfo renderPassBeginInfo =
+          vks::initializers::renderPassBeginInfo();
+      renderPassBeginInfo.renderPass = renderPass_;
+      renderPassBeginInfo.renderArea.offset.x = 0;
+      renderPassBeginInfo.renderArea.offset.y = 0;
+      renderPassBeginInfo.renderArea.extent.width = width_;
+      renderPassBeginInfo.renderArea.extent.height = height_;
+      renderPassBeginInfo.clearValueCount = 2;
+      renderPassBeginInfo.pClearValues = clearValues;
+      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+
+      VkViewport viewport = vks::initializers::viewport(
+          (float)width_, (float)height_, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+      VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
+          &descriptorSets_[currentBuffer_].spaceship, 0, nullptr);
+
+      // Skybox
+      if (displaySkybox_) {
+        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipelines_.skybox);
+        models_.skybox.draw(cmdBuffer);
+      }
+
+      // 3D object
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines_.reflect);
+      models_.objects[models_.objectIndex].draw(cmdBuffer);
+
+      vkCmdEndRenderPass(cmdBuffer);
     }
 
-    // 3D object
-    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipelines_.reflect);
-    models_.objects[models_.objectIndex].draw(cmdBuffer);
-
     drawUI(cmdBuffer);
-
-    vkCmdEndRenderPass(cmdBuffer);
 
     VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
   }
@@ -336,6 +380,7 @@ class VulkanExample : public VulkanExampleBase {
                            (float)cubeMap_.mipLevels);
       overlay->comboBox("Object type", &models_.objectIndex, objectNames_);
       overlay->checkBox("Skybox", &displaySkybox_);
+      overlay->checkBox("Blackhole", &enableBlackhole_);
     }
   }
 
