@@ -7,16 +7,17 @@ layout (location = 0) out vec4 outFragColor;
 
 layout (binding = 2) uniform UBO
 {
-float mouseX;
-float mouseY;
-// time elapsed in seconds
-float time;
-vec2 resolution;
-bool mouseControl;
+    glm::vec3 cameraPos;
+    glm::vec2 resolution;
+    float mouseX;
+    float mouseY;
+    float time;
+    bool mouseControl;
 } ubo;
 
-layout (binding = 3) uniform samplerCube galaxy_skybox;
-layout (binding = 4) uniform sampler2D colorMap;
+// Texture maps
+layout (binding = 1) uniform samplerCube galaxy_skybox;
+layout (binding = 3) uniform sampler2D colorMap;
 
 const float PI = 3.14159265359;
 const float EPSILON = 0.0001;

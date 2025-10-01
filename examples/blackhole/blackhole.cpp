@@ -41,6 +41,16 @@ class VulkanExample : public VulkanExampleBase {
   } uniformData_;
   std::array<vks::Buffer, MAX_CONCURRENT_FRAMES> uniformBuffers_;
 
+  struct blackholeUniformData {
+    glm::vec3 cameraPos;
+    glm::vec2 resolution;
+    float mouseX;
+    float mouseY;
+    float time;
+    bool mouseControl = true;
+  } blackholeUniformData_;
+  std::array<vks::Buffer, MAX_CONCURRENT_FRAMES> blackholeUniformBuffers_;
+
   struct {
     VkPipeline skybox{VK_NULL_HANDLE};
     VkPipeline reflect{VK_NULL_HANDLE};
@@ -109,6 +119,15 @@ class VulkanExample : public VulkanExampleBase {
           &buffer, sizeof(uniformData), &uniformData_));
       VK_CHECK_RESULT(buffer.map());
     }
+
+    for (auto& buffer : blackholeUniformBuffers_) {
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer, sizeof(uniformData), &blackholeUniformData_));
+      VK_CHECK_RESULT(buffer.map());
+    }
   }
 
   // (A.3)
@@ -143,17 +162,11 @@ class VulkanExample : public VulkanExampleBase {
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 2),
 
-        // Binding 3 : Fragment shader blackhole 3D cubemap
+        // Binding 3 : Fragment shader blackhole 2D texture
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT,
-            /*binding id*/ 3),
-
-        // Binding 4 : Fragment shader blackhole 2D texture
-        vks::initializers::descriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            /*binding id*/ 4)};
+            /*binding id*/ 3)};
 
     VkDescriptorSetLayoutCreateInfo descriptorLayout =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
@@ -292,6 +305,18 @@ class VulkanExample : public VulkanExampleBase {
     uniformData_.inverseModelview = glm::inverse(camera_.matrices.view);
     memcpy(uniformBuffers_[currentBuffer_].mapped, &uniformData_,
            sizeof(uniformData_));
+
+    // TODO: create a toggle in UI for toggling mouse
+    // blackholeUniformData_.mouseControl = ;
+
+    blackholeUniformData_.mouseX = mouseState.position.x;
+    blackholeUniformData_.mouseY = mouseState.position.y;
+    blackholeUniformData_.time =
+        std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch())
+            .count();
+    blackholeUniformData_.resolution = glm::vec2(width_, height_);
+    blackholeUniformData_.cameraPos = camera_.position;
   }
 
   // (B.2)
