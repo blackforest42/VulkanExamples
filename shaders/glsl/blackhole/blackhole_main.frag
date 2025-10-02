@@ -248,9 +248,6 @@ vec3 rotateVector(vec3 position, vec3 axis, float angle) {
   return vec3(qr.x, qr.y, qr.z);
 }
 
-#define IN_RANGE(x, a, b) (((x) > (a)) && ((x) < (b)))
-
-
 // Convert from Cartesian to spherical coord (rho, phi, theta)
 // https://en.wikipedia.org/wiki/Spherical_coordinate_system
 vec3 toSpherical(vec3 p) {
