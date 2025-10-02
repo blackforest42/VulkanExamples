@@ -38,6 +38,8 @@ class VulkanExample : public VulkanExampleBase {
     alignas(16) glm::vec3 cameraPos;
     alignas(8) glm::vec2 resolution;
     float time;
+    float exposure{1.0f};
+    float gamma{2.2f};
     bool mouseControl = true;
   } uniformData_;
   std::array<vks::Buffer, MAX_CONCURRENT_FRAMES> uniformBuffers_;
@@ -326,7 +328,8 @@ class VulkanExample : public VulkanExampleBase {
     if (overlay->header("Settings")) {
       overlay->comboBox("Object type", &models_.objectIndex, objectNames_);
       overlay->checkBox("Skybox", &displaySkybox_);
-      overlay->checkBox("Blackhole", &enableBlackhole_);
+      overlay->sliderFloat("Exposure", &uniformData_.exposure, 0.1, 10.0);
+      overlay->sliderFloat("Gamma", &uniformData_.gamma, 1.0, 4.0);
     }
   }
 

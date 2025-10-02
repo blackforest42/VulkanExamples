@@ -12,6 +12,9 @@ layout (binding = 0) uniform UBO
     vec3 cameraPos;
     vec2 resolution;
     float time;
+    // Tonemapping
+    float exposure;
+    float gamma;
     bool mouseControl;
 } ubo;
 
@@ -40,10 +43,6 @@ const float AccDiskDensityH = 4.0;
 const float AccDiskNoiseScale = .8;
 const float AccDiskNoiseLOD = 5.0;
 const float AccDiskSpeed = 0.5;
-
-// Tonemapping
-const float exposure = 1.0f;
-const float gamma = 2.2f;
 
 struct Ring {
   vec3 center;
@@ -88,13 +87,12 @@ void main() {
  
 	vec3 dir = normalize(vec3(uv.x, -uv.y,  1.0));
 	dir = mat3(ubo.cameraView) * dir;
-	outFragColor.rgb = traceColor(ubo.cameraPos, dir).rgb;
  
- // Janky tonemapping
-//vec3 hdrColor = traceColor(ubo.cameraPos, dir).rgb;
-//vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
-// Gamma correction
-// outFragColor.rgb = pow(mapped, vec3(1.0 / gamma));
+    // Tonemapping
+    vec3 hdrColor = traceColor(ubo.cameraPos, dir).rgb;
+    vec3 mapped = vec3(1.0) - exp(-hdrColor * ubo.exposure);
+	// Gamma correction
+	outFragColor.rgb = pow(mapped, vec3(1.0 / ubo.gamma));
 }
 
 ///----

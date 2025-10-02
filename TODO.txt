@@ -1,2 +1,2 @@
-Sept 30
-	- still need to port uniforms and ogl blackhole frag shader code
+Oct 1st
+	- dynamic camera position w/ keyboard movement
