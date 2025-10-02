@@ -1,7 +1,6 @@
 #version 450
 
 // in
-layout (location = 0) in vec2 inUV;
 
 // out
 layout (location = 0) out vec4 outFragColor;
@@ -72,9 +71,6 @@ void accDiskColor(vec3 pos, inout vec3 color, inout float alpha);
 vec3 traceColor(vec3 pos, vec3 dir);
 
 void main() {
-	// for testing purposes
-	// outFragColor = texture(colorMap, inUV);
-	// return;
 
     vec2 uv = gl_FragCoord.xy / ubo.resolution.xy - vec2(0.5);
 	uv.x *= ubo.resolution.x / ubo.resolution.y;

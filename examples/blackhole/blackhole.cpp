@@ -229,10 +229,10 @@ class VulkanExample : public VulkanExampleBase {
 
     // Blackhole pipeline
     shaderStages[0] =
-        loadShader(getShadersPath() + "blackhole/blackhole_main.vert.spv",
+        loadShader(getShadersPath() + "blackhole/blackhole.vert.spv",
                    VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
-        loadShader(getShadersPath() + "blackhole/blackhole_main.frag.spv",
+        loadShader(getShadersPath() + "blackhole/blackhole.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
