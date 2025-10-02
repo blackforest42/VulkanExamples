@@ -69,7 +69,6 @@ void cartesianToSpherical(in vec3 xyz,
                           out float phi,
                           out float theta);
 vec3 toSpherical(vec3 p);
-vec3 toSpherical2(vec3 pos);
 void ringColor(vec3 rayOrigin,
                vec3 rayDir,
                Ring ring,
@@ -90,13 +89,11 @@ void main() {
 	vec3 dir = normalize(vec3(uv.x, -uv.y,  1.0));
 	dir = mat3(ubo.cameraView) * dir;
 	//outFragColor.rgb = texture(galaxyCubemap, vec3(dir)).rgb;
-    outFragColor.rgb = traceColor(ubo.cameraPos, dir);
+    vec3 hdrColor = traceColor(ubo.cameraPos, dir).rgb;
 
-// tone mapping
-// vec3 hdrColor = texture(galaxyCubemap, vec3(dir)).rgb;
-//vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
+vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
 // Gamma correction
-//outFragColor.rgb = pow(mapped, vec3(1.0 / gamma));
+outFragColor.rgb = pow(mapped, vec3(1.0 / gamma));
 }
 
 ///----
@@ -178,8 +175,8 @@ float snoise(vec3 v) {
   return 42.0 *
          dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
-///----
 
+///----
 float ringDistance(vec3 rayOrigin, vec3 rayDir, Ring ring) {
   float denominator = dot(rayDir, ring.normal);
   float constant = -dot(ring.center, ring.normal);
@@ -261,14 +258,6 @@ vec3 toSpherical(vec3 p) {
   float theta = atan(p.z, p.x);
   float phi = asin(p.y / rho);
   return vec3(rho, theta, phi);
-}
-
-vec3 toSpherical2(vec3 pos) {
-  vec3 radialCoords;
-  radialCoords.x = length(pos) * 1.5 + 0.55;
-  radialCoords.y = atan(-pos.x, -pos.z) * 1.5;
-  radialCoords.z = abs(pos.y);
-  return radialCoords;
 }
 
 void ringColor(vec3 rayOrigin,

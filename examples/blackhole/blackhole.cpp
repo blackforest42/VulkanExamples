@@ -35,8 +35,8 @@ class VulkanExample : public VulkanExampleBase {
 
   struct uniformData {
     glm::mat4 cameraView;
-    glm::vec3 cameraPos;
-    glm::vec2 resolution;
+    alignas(16) glm::vec3 cameraPos;
+    alignas(8) glm::vec2 resolution;
     float time;
     bool mouseControl = true;
   } uniformData_;
@@ -258,7 +258,7 @@ class VulkanExample : public VulkanExampleBase {
     uniformData_.cameraView = camera_.matrices.view;
     uniformData_.cameraPos = camera_.position;
     uniformData_.time =
-        std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::duration<double>(
             std::chrono::high_resolution_clock::now().time_since_epoch())
             .count();
     uniformData_.resolution = glm::vec2(width_, height_);
