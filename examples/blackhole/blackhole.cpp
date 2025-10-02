@@ -24,16 +24,36 @@ class VulkanExample : public VulkanExampleBase {
   vks::Texture colorMap_{};
 
   bool showBlackholeUI = true;
+  bool gravatationalLensingEnabled = true;
+  bool accDiskEnabled = true;
+  bool accDiskParticleEnabled = true;
 
   struct uniformData {
     alignas(16) glm::mat4 cameraView;
     alignas(16) glm::vec3 cameraPos;
     alignas(8) glm::vec2 resolution;
+
+    // Epoch time in seconds
     float time;
+
+    // Tonemapping
     float exposure{1.0f};
     float gamma{2.2f};
-    uint32_t showBlackhole;
+
+    int showBlackhole;
+    int gravatationalLensingEnabled;
+    int accDiskEnabled;
+    int accDiskParticleEnabled;
+
+    float accDiskHeight{0.55};
+    float accDiskLit{0.25};
+    float accDiskDensityV{2.0};
+    float accDiskDensityH{4.0};
+    float accDiskNoiseScale{.8};
+    int accDiskNoiseLOD{5};
+    float accDiskSpeed{0.5};
   } uniformData_;
+
   std::array<vks::Buffer, MAX_CONCURRENT_FRAMES> uniformBuffers_;
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};
@@ -240,6 +260,10 @@ class VulkanExample : public VulkanExampleBase {
             .count();
     uniformData_.resolution = glm::vec2(width_, height_);
     uniformData_.showBlackhole = showBlackholeUI;
+    uniformData_.gravatationalLensingEnabled = gravatationalLensingEnabled;
+    uniformData_.accDiskEnabled = accDiskEnabled;
+    uniformData_.accDiskParticleEnabled = accDiskParticleEnabled;
+
     memcpy(uniformBuffers_[currentBuffer_].mapped, &uniformData_,
            sizeof(uniformData_));
   }
@@ -294,7 +318,26 @@ class VulkanExample : public VulkanExampleBase {
 
   virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay) {
     if (overlay->header("Settings")) {
-      overlay->checkBox("Show blackhole", &showBlackholeUI);
+      overlay->checkBox("Show Blackhole", &showBlackholeUI);
+      overlay->checkBox("Show Gravitational Lensing",
+                        &gravatationalLensingEnabled);
+      overlay->checkBox("Accretion Disk Enabled", &accDiskEnabled);
+      overlay->checkBox("Disk Particles Enabled", &accDiskParticleEnabled);
+      overlay->sliderFloat("Accretion Disk Height", &uniformData_.accDiskHeight,
+                           0.0, 1.0);
+      overlay->sliderFloat("Accretion Disk Intensity", &uniformData_.accDiskLit,
+                           0.0, 1.0);
+      overlay->sliderFloat("Accretion Disk Density V",
+                           &uniformData_.accDiskDensityV, 0.0, 3.0);
+      overlay->sliderFloat("Accretion Disk Density H",
+                           &uniformData_.accDiskDensityH, 0.0, 5.0);
+      overlay->sliderFloat("Accretion Disk Noise Scale",
+                           &uniformData_.accDiskNoiseScale, 0.1, 5.0);
+      overlay->sliderInt("Accretion Disk LOD", &uniformData_.accDiskNoiseLOD, 0,
+                         10);
+      overlay->sliderFloat("Accretion Disk Speed", &uniformData_.accDiskSpeed,
+                           0.0, 2.0);
+
       overlay->sliderFloat("Exposure", &uniformData_.exposure, 0.1, 10.0);
       overlay->sliderFloat("Gamma", &uniformData_.gamma, 1.0, 4.0);
     }

@@ -19,6 +19,17 @@ layout (binding = 0) uniform UBO
     float gamma;
 
     int showBlackhole;
+    int gravatationalLensingEnabled;
+	int accDiskEnabled;
+	int accDiskParticleEnabled;
+
+	float accDiskHeight;
+	float accDiskLit;
+	float accDiskDensityV;
+	float accDiskDensityH;
+	float accDiskNoiseScale;
+	int accDiskNoiseLOD;
+	float accDiskSpeed;
 } ubo;
 
 // Texture maps
@@ -29,23 +40,6 @@ const float PI = 3.14159265359;
 const float EPSILON = 0.0001;
 const float INFINITY = 1000000.0;
 const int SAMPLES_PER_PIXEL = 300;
-
-const bool frontView = false;
-const bool topView = false;
-const float cameraRoll = 0.0;
-
-const float gravatationalLensing = 1.0;
-const float fovScale = 1.0;
-
-const float AccDiskEnabled = 1.0;
-const float AccDiskParticle = 1.0;
-const float AccDiskHeight = 0.55;
-const float AccDiskLit = 0.25;
-const float AccDiskDensityV = 2.0;
-const float AccDiskDensityH = 4.0;
-const float AccDiskNoiseScale = .8;
-const float AccDiskNoiseLOD = 5.0;
-const float AccDiskSpeed = 0.5;
 
 // For debugging
 struct Ring {
@@ -307,12 +301,12 @@ void accDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
   // Density linearly decreases as the distance to the blackhole center
   // increases.
   float density = max(
-      0.0, 1.0 - length(pos.xyz / vec3(outerRadius, AccDiskHeight, outerRadius)));
+      0.0, 1.0 - length(pos.xyz / vec3(outerRadius, ubo.accDiskHeight, outerRadius)));
   if (density < 0.001) {
     return;
   }
 
-  density *= pow(1.0 - abs(pos.y) / AccDiskHeight, AccDiskDensityV);
+  density *= pow(1.0 - abs(pos.y) / ubo.accDiskHeight, ubo.accDiskDensityV);
 
   // Set particale density to 0 when radius is below the inner most stable
   // circular orbit.
@@ -330,28 +324,28 @@ void accDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
   sphericalCoord.y *= 2.0;
   sphericalCoord.z *= 4.0;
 
-  density *= 1.0 / pow(sphericalCoord.x, AccDiskDensityH);
+  density *= 1.0 / pow(sphericalCoord.x, ubo.accDiskDensityH);
   density *= 16000.0;
 
-  if (AccDiskParticle < 0.5) {
-    color += vec3(0.0, 1.0, 0.0) * density * 0.02;
+  if (ubo.accDiskParticleEnabled == 0) {
+    color += vec3(.953, .898, .671) * density * 0.02;
     return;
   }
 
   float noise = 1.0;
-  for (int i = 0; i < int(AccDiskNoiseLOD); i++) {
-    noise *= 0.5 * snoise(sphericalCoord * pow(i, 2) * AccDiskNoiseScale) + 0.5;
+  for (int i = 0; i < int(ubo.accDiskNoiseLOD); i++) {
+    noise *= 0.5 * snoise(sphericalCoord * pow(i, 2) * ubo.accDiskNoiseScale) + 0.5;
     if (i % 2 == 0) {
-      sphericalCoord.y += ubo.time * AccDiskSpeed;
+      sphericalCoord.y += ubo.time * ubo.accDiskSpeed;
     } else {
-      sphericalCoord.y -= ubo.time * AccDiskSpeed;
+      sphericalCoord.y -= ubo.time * ubo.accDiskSpeed;
     }
   }
 
   vec3 dustColor =
       texture(colorMap, vec2(sphericalCoord.x / outerRadius, 0.5)).rgb;
 
-  color += density * AccDiskLit * dustColor * alpha * abs(noise);
+  color += density * ubo.accDiskLit * dustColor * alpha * abs(noise);
 }
 
 vec3 traceColor(vec3 pos, vec3 dir) {
@@ -367,7 +361,7 @@ vec3 traceColor(vec3 pos, vec3 dir) {
 
   for (int i = 0; i < SAMPLES_PER_PIXEL; i++) {
       // If gravatational lensing is applied
-      if (gravatationalLensing > 0.5) {
+      if (ubo.gravatationalLensingEnabled > 0.5) {
         vec3 acc = accel(h2, pos);
         dir += acc;
       }
@@ -389,7 +383,7 @@ vec3 traceColor(vec3 pos, vec3 dir) {
         ring.rotateSpeed = 0.08;
         ringColor(pos, dir, ring, minDistance, color);
       } else {
-        if (AccDiskEnabled > 0.5) {
+        if (ubo.accDiskEnabled > 0.5) {
           accDiskColor(pos, color, alpha);
         }
       }
