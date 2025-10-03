@@ -471,11 +471,11 @@ class VulkanExample : public VulkanExampleBase {
                                                &descriptorSets_[i].bloom));
       writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].bloom, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-              &uniformBuffers_[i].bloom.descriptor),
+              descriptorSets_[i].bloom, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].bloom.descriptor),
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].bloom,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
               &offscreenPass_.framebuffers.descriptor),
       };
       vkUpdateDescriptorSets(device_,
@@ -492,6 +492,10 @@ class VulkanExample : public VulkanExampleBase {
             &descriptorSetLayouts_.blackhole, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.blackhole));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.bloom, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.bloom));
 
     // Pipeline
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
@@ -522,7 +526,7 @@ class VulkanExample : public VulkanExampleBase {
 
     VkGraphicsPipelineCreateInfo pipelineCI =
         vks::initializers::pipelineCreateInfo(pipelineLayouts_.blackhole,
-                                              renderPass_, 0);
+                                              offscreenPass_.renderPass, 0);
     pipelineCI.pInputAssemblyState = &inputAssemblyState;
     pipelineCI.pRasterizationState = &rasterizationState;
     pipelineCI.pColorBlendState = &colorBlendState;
@@ -532,10 +536,10 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.pDynamicState = &dynamicState;
     pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineCI.pStages = shaderStages.data();
-    pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
-        {vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal});
-
-    // Enable depth test and write
+    // No vertex input
+    VkPipelineVertexInputStateCreateInfo emptyInputState =
+        vks::initializers::pipelineVertexInputStateCreateInfo();
+    pipelineCI.pVertexInputState = &emptyInputState;
 
     // Blackhole pipeline
     shaderStages[0] =
@@ -548,6 +552,18 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.blackhole));
+
+    // Bloom pipeline
+    pipelineCI.pVertexInputState = &emptyInputState;
+    pipelineCI.layout = pipelineLayouts_.bloom;
+    pipelineCI.renderPass = renderPass_;
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/bloom.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] = loadShader(getShadersPath() + "blackhole/bloom.frag.spv",
+                                 VK_SHADER_STAGE_FRAGMENT_BIT);
+    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.bloom));
   }
 
   // (B) Called in VulkanExampleBase::renderLoop()
@@ -1207,8 +1223,12 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroySampler(device_, cubeMap_.sampler, nullptr);
       vkFreeMemory(device_, cubeMap_.deviceMemory, nullptr);
       vkDestroyPipeline(device_, pipelines_.blackhole, nullptr);
+      vkDestroyPipeline(device_, pipelines_.bloom, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.blackhole, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.bloom, nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blackhole,
+                                   nullptr);
+      vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.bloom,
                                    nullptr);
       for (auto& buffer : uniformBuffers_) {
         buffer.blackhole.destroy();
