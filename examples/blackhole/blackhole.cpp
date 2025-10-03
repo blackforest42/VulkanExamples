@@ -19,7 +19,6 @@
 #include "stb_image.h"
 
 // Offscreen frame buffer properties
-#define FB_DIM 256
 #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 
 class VulkanExample : public VulkanExampleBase {
@@ -163,8 +162,8 @@ class VulkanExample : public VulkanExampleBase {
   // (A.3) Prepare the offscreen framebuffers used for the vertical- and
   // horizontal blur
   void prepareOffscreen() {
-    offscreenPass_.width = FB_DIM;
-    offscreenPass_.height = FB_DIM;
+    offscreenPass_.width = width_;
+    offscreenPass_.height = height_;
 
     // Find a suitable depth format
     VkFormat fbDepthFormat;
@@ -271,7 +270,7 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(
         vkCreateSampler(device_, &sampler, nullptr, &offscreenPass_.sampler));
 
-    // Create two frame buffers
+    // Create one frame buffer
     prepareOffscreenFramebuffer(&offscreenPass_.framebuffers, FB_COLOR_FORMAT,
                                 fbDepthFormat);
   }
@@ -285,8 +284,8 @@ class VulkanExample : public VulkanExampleBase {
     VkImageCreateInfo image = vks::initializers::imageCreateInfo();
     image.imageType = VK_IMAGE_TYPE_2D;
     image.format = colorFormat;
-    image.extent.width = FB_DIM;
-    image.extent.height = FB_DIM;
+    image.extent.width = width_;
+    image.extent.height = height_;
     image.extent.depth = 1;
     image.mipLevels = 1;
     image.arrayLayers = 1;
@@ -368,8 +367,8 @@ class VulkanExample : public VulkanExampleBase {
     fbufCreateInfo.renderPass = offscreenPass_.renderPass;
     fbufCreateInfo.attachmentCount = 2;
     fbufCreateInfo.pAttachments = attachments;
-    fbufCreateInfo.width = FB_DIM;
-    fbufCreateInfo.height = FB_DIM;
+    fbufCreateInfo.width = width_;
+    fbufCreateInfo.height = height_;
     fbufCreateInfo.layers = 1;
 
     VK_CHECK_RESULT(vkCreateFramebuffer(device_, &fbufCreateInfo, nullptr,
@@ -634,23 +633,24 @@ class VulkanExample : public VulkanExampleBase {
 
       VkRenderPassBeginInfo renderPassBeginInfo =
           vks::initializers::renderPassBeginInfo();
-      renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
-      renderPassBeginInfo.framebuffer = offscreenPass_.framebuffers.framebuffer;
-      renderPassBeginInfo.renderArea.extent.width = offscreenPass_.width;
-      renderPassBeginInfo.renderArea.extent.height = offscreenPass_.height;
+      renderPassBeginInfo.renderPass = renderPass_;
+      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+      //  renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+      //  renderPassBeginInfo.framebuffer =
+      //  offscreenPass_.framebuffers.framebuffer;
+      renderPassBeginInfo.renderArea.extent.width = width_;
+      renderPassBeginInfo.renderArea.extent.height = height_;
       renderPassBeginInfo.clearValueCount = 2;
       renderPassBeginInfo.pClearValues = clearValues.data();
 
       vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
-      VkViewport viewport =
-          vks::initializers::viewport((float)offscreenPass_.width,
-                                      (float)offscreenPass_.height, 0.0f, 1.0f);
+      VkViewport viewport = vks::initializers::viewport(
+          (float)width_, (float)height_, 0.0f, 1.0f);
       vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
-      VkRect2D scissor = vks::initializers::rect2D(offscreenPass_.width,
-                                                   offscreenPass_.height, 0, 0);
+      VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
       vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
       vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -665,43 +665,46 @@ class VulkanExample : public VulkanExampleBase {
       vkCmdEndRenderPass(cmdBuffer);
     }
 
-    // Bloom
-    {
-      VkClearValue clearValues[2]{};
-      clearValues[0].color = {1.f, 0, 0};
-      clearValues[1].depthStencil = {1.0f, 0};
+    /*
+        // Bloom
+            {
+              VkClearValue clearValues[2]{};
+              clearValues[0].color = {1.f, 0, 0};
+              clearValues[1].depthStencil = {1.0f, 0};
 
-      VkRenderPassBeginInfo renderPassBeginInfo =
-          vks::initializers::renderPassBeginInfo();
-      renderPassBeginInfo.renderPass = renderPass_;
-      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
-      renderPassBeginInfo.renderArea.offset.x = 0;
-      renderPassBeginInfo.renderArea.offset.y = 0;
-      renderPassBeginInfo.renderArea.extent.width = width_;
-      renderPassBeginInfo.renderArea.extent.height = height_;
-      renderPassBeginInfo.clearValueCount = 2;
-      renderPassBeginInfo.pClearValues = clearValues;
+              VkRenderPassBeginInfo renderPassBeginInfo =
+                  vks::initializers::renderPassBeginInfo();
+              renderPassBeginInfo.renderPass = renderPass_;
+              renderPassBeginInfo.framebuffer =
+       frameBuffers_[currentImageIndex_];
+              renderPassBeginInfo.renderArea.offset.x = 0;
+              renderPassBeginInfo.renderArea.offset.y = 0;
+              renderPassBeginInfo.renderArea.extent.width = width_;
+              renderPassBeginInfo.renderArea.extent.height = height_;
+              renderPassBeginInfo.clearValueCount = 2;
+              renderPassBeginInfo.pClearValues = clearValues;
 
-      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                           VK_SUBPASS_CONTENTS_INLINE);
-      VkViewport viewport = vks::initializers::viewport(
-          (float)width_, (float)height_, 0.0f, 1.0f);
-      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+              vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                                   VK_SUBPASS_CONTENTS_INLINE);
+              VkViewport viewport = vks::initializers::viewport(
+                  (float)width_, (float)height_, 0.0f, 1.0f);
+              vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
-      VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
-      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+              VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0,
+       0); vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-      vkCmdBindDescriptorSets(
-          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.bloom, 0,
-          1, &descriptorSets_[currentBuffer_].bloom, 0, nullptr);
+              vkCmdBindDescriptorSets(
+                  cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+           pipelineLayouts_.bloom, 0, 1, &descriptorSets_[currentBuffer_].bloom,
+       0, nullptr);
 
-      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        pipelines_.bloom);
-      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
-      drawUI(cmdBuffer);
-      vkCmdEndRenderPass(cmdBuffer);
-    }
-
+              vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                pipelines_.bloom);
+              vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+              drawUI(cmdBuffer);
+              vkCmdEndRenderPass(cmdBuffer);
+            }
+        */
     VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
   }
 
