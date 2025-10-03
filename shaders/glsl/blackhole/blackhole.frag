@@ -13,10 +13,6 @@ layout (binding = 0) uniform UBO
 
     float time;
 
-    // Tonemapping
-    float exposure;
-    float gamma;
-
     int showBlackhole;
     int gravatationalLensingEnabled;
 	int accDiskEnabled;
@@ -85,10 +81,7 @@ void main() {
     } else {
         hdrColor = texture(galaxyCubemap, dir).rgb;
     }
-    // Tonemapping
-    vec3 mapped = vec3(1.0) - exp(-hdrColor * ubo.exposure);
-	// Gamma correction
-	outFragColor.rgb = pow(mapped, vec3(1.0 / ubo.gamma));
+	outFragColor.rgb = hdrColor;
 }
 
 

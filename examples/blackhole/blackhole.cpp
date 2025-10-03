@@ -40,10 +40,6 @@ class VulkanExample : public VulkanExampleBase {
     // Epoch time in seconds
     float time;
 
-    // Tonemapping
-    float exposure{1.0f};
-    float gamma{2.2f};
-
     int showBlackhole;
     int gravatationalLensingEnabled;
     int accDiskEnabled;
@@ -58,7 +54,11 @@ class VulkanExample : public VulkanExampleBase {
     float accDiskSpeed{0.5};
   };
 
-  struct BloomUBO {};
+  struct BloomUBO {
+    // Tonemapping
+    float exposure{1.0f};
+    float gamma{2.2f};
+  };
 
   struct {
     BlackholeUBO blackhole;
@@ -150,6 +150,13 @@ class VulkanExample : public VulkanExampleBase {
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
           &buffer.blackhole, sizeof(BlackholeUBO), &ubos_.blackhole));
       VK_CHECK_RESULT(buffer.blackhole.map());
+
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.bloom, sizeof(BloomUBO), &ubos_.bloom));
+      VK_CHECK_RESULT(buffer.bloom.map());
     }
   }
 
@@ -525,8 +532,8 @@ class VulkanExample : public VulkanExampleBase {
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
     VkGraphicsPipelineCreateInfo pipelineCI =
-        vks::initializers::pipelineCreateInfo(pipelineLayouts_.blackhole,
-                                              offscreenPass_.renderPass, 0);
+        vks::initializers::pipelineCreateInfo(pipelineLayouts_.bloom,
+                                              renderPass_, 0);
     pipelineCI.pInputAssemblyState = &inputAssemblyState;
     pipelineCI.pRasterizationState = &rasterizationState;
     pipelineCI.pColorBlendState = &colorBlendState;
@@ -536,34 +543,49 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.pDynamicState = &dynamicState;
     pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineCI.pStages = shaderStages.data();
+
+    // Bloom pipeline
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/bloom.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] = loadShader(getShadersPath() + "blackhole/bloom.frag.spv",
+                                 VK_SHADER_STAGE_FRAGMENT_BIT);
+
     // No vertex input
     VkPipelineVertexInputStateCreateInfo emptyInputState =
         vks::initializers::pipelineVertexInputStateCreateInfo();
     pipelineCI.pVertexInputState = &emptyInputState;
+    pipelineCI.layout = pipelineLayouts_.bloom;
+
+    // Additive blending
+    blendAttachmentState.colorWriteMask = 0xF;
+    blendAttachmentState.blendEnable = VK_TRUE;
+    blendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+    blendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    blendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+    blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.bloom));
 
     // Blackhole pipeline
+    pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
+        {vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV,
+         vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal});
+    pipelineCI.layout = pipelineLayouts_.blackhole;
+    pipelineCI.renderPass = offscreenPass_.renderPass;
     shaderStages[0] =
         loadShader(getShadersPath() + "blackhole/blackhole.vert.spv",
                    VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/blackhole.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
+    blendAttachmentState.blendEnable = VK_FALSE;
+    depthStencilState.depthWriteEnable = VK_TRUE;
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.blackhole));
-
-    // Bloom pipeline
-    pipelineCI.pVertexInputState = &emptyInputState;
-    pipelineCI.layout = pipelineLayouts_.bloom;
-    pipelineCI.renderPass = renderPass_;
-    shaderStages[0] = loadShader(getShadersPath() + "blackhole/bloom.vert.spv",
-                                 VK_SHADER_STAGE_VERTEX_BIT);
-    shaderStages[1] = loadShader(getShadersPath() + "blackhole/bloom.frag.spv",
-                                 VK_SHADER_STAGE_FRAGMENT_BIT);
-    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.bloom));
   }
 
   // (B) Called in VulkanExampleBase::renderLoop()
@@ -592,6 +614,8 @@ class VulkanExample : public VulkanExampleBase {
 
     memcpy(uniformBuffers_[currentBuffer_].blackhole.mapped, &ubos_.blackhole,
            sizeof(BlackholeUBO));
+    memcpy(uniformBuffers_[currentBuffer_].bloom.mapped, &ubos_.bloom,
+           sizeof(BloomUBO));
   }
 
   // (B.2)
@@ -602,42 +626,81 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::commandBufferBeginInfo();
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
+    // Blackhole
+    {
+      std::array<VkClearValue, 2> clearValues{};
+      clearValues[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+      clearValues[1].depthStencil = {1.0f, 0};
 
-    VkRenderPassBeginInfo renderPassBeginInfo =
-        vks::initializers::renderPassBeginInfo();
-    renderPassBeginInfo.renderPass = renderPass_;
-    renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
-    renderPassBeginInfo.renderArea.offset.x = 0;
-    renderPassBeginInfo.renderArea.offset.y = 0;
-    renderPassBeginInfo.renderArea.extent.width = width_;
-    renderPassBeginInfo.renderArea.extent.height = height_;
-    renderPassBeginInfo.clearValueCount = 2;
-    renderPassBeginInfo.pClearValues = clearValues.data();
+      VkRenderPassBeginInfo renderPassBeginInfo =
+          vks::initializers::renderPassBeginInfo();
+      renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+      renderPassBeginInfo.framebuffer = offscreenPass_.framebuffers.framebuffer;
+      renderPassBeginInfo.renderArea.extent.width = offscreenPass_.width;
+      renderPassBeginInfo.renderArea.extent.height = offscreenPass_.height;
+      renderPassBeginInfo.clearValueCount = 2;
+      renderPassBeginInfo.pClearValues = clearValues.data();
 
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
 
-    VkViewport viewport =
-        vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
-    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+      VkViewport viewport =
+          vks::initializers::viewport((float)offscreenPass_.width,
+                                      (float)offscreenPass_.height, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
-    VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
-    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+      VkRect2D scissor = vks::initializers::rect2D(offscreenPass_.width,
+                                                   offscreenPass_.height, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-    vkCmdBindDescriptorSets(
-        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.blackhole,
-        0, 1, &descriptorSets_[currentBuffer_].blackhole, 0, nullptr);
+      vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              pipelineLayouts_.blackhole, 0, 1,
+                              &descriptorSets_[currentBuffer_].blackhole, 0,
+                              nullptr);
 
-    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipelines_.blackhole);
-    vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines_.blackhole);
+      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
 
-    vkCmdEndRenderPass(cmdBuffer);
+      vkCmdEndRenderPass(cmdBuffer);
+    }
 
-    drawUI(cmdBuffer);
+    // Bloom
+    {
+      VkClearValue clearValues[2]{};
+      clearValues[0].color = {1.f, 0, 0};
+      clearValues[1].depthStencil = {1.0f, 0};
+
+      VkRenderPassBeginInfo renderPassBeginInfo =
+          vks::initializers::renderPassBeginInfo();
+      renderPassBeginInfo.renderPass = renderPass_;
+      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+      renderPassBeginInfo.renderArea.offset.x = 0;
+      renderPassBeginInfo.renderArea.offset.y = 0;
+      renderPassBeginInfo.renderArea.extent.width = width_;
+      renderPassBeginInfo.renderArea.extent.height = height_;
+      renderPassBeginInfo.clearValueCount = 2;
+      renderPassBeginInfo.pClearValues = clearValues;
+
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+      VkViewport viewport = vks::initializers::viewport(
+          (float)width_, (float)height_, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+      VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.bloom, 0,
+          1, &descriptorSets_[currentBuffer_].bloom, 0, nullptr);
+
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines_.bloom);
+      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+      drawUI(cmdBuffer);
+      vkCmdEndRenderPass(cmdBuffer);
+    }
 
     VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
   }
@@ -664,8 +727,8 @@ class VulkanExample : public VulkanExampleBase {
       overlay->sliderFloat("Accretion Disk Speed",
                            &ubos_.blackhole.accDiskSpeed, 0.0, 2.0);
 
-      overlay->sliderFloat("Exposure", &ubos_.blackhole.exposure, 0.1, 10.0);
-      overlay->sliderFloat("Gamma", &ubos_.blackhole.gamma, 1.0, 4.0);
+      overlay->sliderFloat("Exposure", &ubos_.bloom.exposure, 0.1, 10.0);
+      overlay->sliderFloat("Gamma", &ubos_.bloom.gamma, 1.0, 4.0);
     }
   }
 
