@@ -18,6 +18,10 @@
 #include "VulkanglTFModel.h"
 #include "stb_image.h"
 
+// Offscreen frame buffer properties
+#define FB_DIM 256
+#define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
+
 class VulkanExample : public VulkanExampleBase {
  public:
   vks::Texture cubeMap_{};
@@ -28,7 +32,7 @@ class VulkanExample : public VulkanExampleBase {
   bool accDiskEnabled = true;
   bool accDiskParticleEnabled = true;
 
-  struct uniformData {
+  struct BlackholeUBO {
     alignas(16) glm::mat4 cameraView;
     alignas(16) glm::vec3 cameraPos;
     alignas(8) glm::vec2 resolution;
@@ -52,9 +56,20 @@ class VulkanExample : public VulkanExampleBase {
     float accDiskNoiseScale{.8};
     int accDiskNoiseLOD{5};
     float accDiskSpeed{0.5};
-  } uniformData_;
+  };
 
-  std::array<vks::Buffer, MAX_CONCURRENT_FRAMES> uniformBuffers_;
+  struct BloomUBO {};
+
+  struct {
+    BlackholeUBO blackhole;
+    BloomUBO bloom;
+  } ubos_;
+
+  struct UniformBuffers {
+    vks::Buffer bloom;
+    vks::Buffer blackhole;
+  };
+  std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
 
   struct {
     VkPipelineLayout bloom;
@@ -71,7 +86,29 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorSetLayout blackhole;
   } descriptorSetLayouts_{};
 
-  std::array<VkDescriptorSet, MAX_CONCURRENT_FRAMES> descriptorSet_{};
+  struct DescriptorSets {
+    VkDescriptorSet bloom;
+    VkDescriptorSet blackhole;
+  };
+  std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
+
+  // Framebuffer for offscreen rendering
+  struct FrameBufferAttachment {
+    VkImage image;
+    VkDeviceMemory mem;
+    VkImageView view;
+  };
+  struct FrameBuffer {
+    VkFramebuffer framebuffer;
+    FrameBufferAttachment color, depth;
+    VkDescriptorImageInfo descriptor;
+  };
+  struct OffscreenPass {
+    int32_t width, height;
+    VkRenderPass renderPass;
+    VkSampler sampler;
+    FrameBuffer framebuffers;
+  } offscreenPass_{};  // Handles the bloom pass
 
   VulkanExample() : VulkanExampleBase() {
     title = "Blackhole";
@@ -87,6 +124,7 @@ class VulkanExample : public VulkanExampleBase {
     VulkanExampleBase::prepare();
     loadAssets();
     prepareUniformBuffers();
+    prepareOffscreen();
     setupDescriptors();
     preparePipelines();
     prepared_ = true;
@@ -110,26 +148,250 @@ class VulkanExample : public VulkanExampleBase {
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-          &buffer, sizeof(uniformData), &uniformData_));
-      VK_CHECK_RESULT(buffer.map());
+          &buffer.blackhole, sizeof(BlackholeUBO), &ubos_.blackhole));
+      VK_CHECK_RESULT(buffer.blackhole.map());
     }
+  }
+
+  // (A.3) Prepare the offscreen framebuffers used for the vertical- and
+  // horizontal blur
+  void prepareOffscreen() {
+    offscreenPass_.width = FB_DIM;
+    offscreenPass_.height = FB_DIM;
+
+    // Find a suitable depth format
+    VkFormat fbDepthFormat;
+    VkBool32 validDepthFormat =
+        vks::tools::getSupportedDepthFormat(physicalDevice_, &fbDepthFormat);
+    assert(validDepthFormat);
+
+    // Create a separate render pass for the offscreen rendering as it may
+    // differ from the one used for scene rendering
+
+    std::array<VkAttachmentDescription, 2> attchmentDescriptions = {};
+    // Color attachment
+    attchmentDescriptions[0].format = FB_COLOR_FORMAT;
+    attchmentDescriptions[0].samples = VK_SAMPLE_COUNT_1_BIT;
+    attchmentDescriptions[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attchmentDescriptions[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attchmentDescriptions[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attchmentDescriptions[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attchmentDescriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attchmentDescriptions[0].finalLayout =
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    // Depth attachment
+    attchmentDescriptions[1].format = fbDepthFormat;
+    attchmentDescriptions[1].samples = VK_SAMPLE_COUNT_1_BIT;
+    attchmentDescriptions[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attchmentDescriptions[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attchmentDescriptions[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attchmentDescriptions[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attchmentDescriptions[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attchmentDescriptions[1].finalLayout =
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorReference = {
+        0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference depthReference = {
+        1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+
+    VkSubpassDescription subpassDescription = {};
+    subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpassDescription.colorAttachmentCount = 1;
+    subpassDescription.pColorAttachments = &colorReference;
+    subpassDescription.pDepthStencilAttachment = &depthReference;
+
+    // Use subpass dependencies for layout transitions
+    std::array<VkSubpassDependency, 3> dependencies{};
+
+    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependencies[0].dstSubpass = 0;
+    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                                   VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                                   VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependencies[0].srcAccessMask =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependencies[0].dstAccessMask =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    dependencies[0].dependencyFlags = 0;
+
+    dependencies[1].srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependencies[1].dstSubpass = 0;
+    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dependencies[1].dstStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependencies[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    dependencies[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    dependencies[2].srcSubpass = 0;
+    dependencies[2].dstSubpass = VK_SUBPASS_EXTERNAL;
+    dependencies[2].srcStageMask =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependencies[2].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependencies[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    dependencies[2].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    // Create the actual renderpass
+    VkRenderPassCreateInfo renderPassInfo = {};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount =
+        static_cast<uint32_t>(attchmentDescriptions.size());
+    renderPassInfo.pAttachments = attchmentDescriptions.data();
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpassDescription;
+    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    renderPassInfo.pDependencies = dependencies.data();
+    VK_CHECK_RESULT(vkCreateRenderPass(device_, &renderPassInfo, nullptr,
+                                       &offscreenPass_.renderPass));
+
+    // Create sampler to sample from the color attachments
+    VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
+    sampler.magFilter = VK_FILTER_LINEAR;
+    sampler.minFilter = VK_FILTER_LINEAR;
+    sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    sampler.addressModeV = sampler.addressModeU;
+    sampler.addressModeW = sampler.addressModeU;
+    sampler.mipLodBias = 0.0f;
+    sampler.maxAnisotropy = 1.0f;
+    sampler.minLod = 0.0f;
+    sampler.maxLod = 1.0f;
+    sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    VK_CHECK_RESULT(
+        vkCreateSampler(device_, &sampler, nullptr, &offscreenPass_.sampler));
+
+    // Create two frame buffers
+    prepareOffscreenFramebuffer(&offscreenPass_.framebuffers, FB_COLOR_FORMAT,
+                                fbDepthFormat);
+  }
+
+  // (A.4) Setup the offscreen framebuffer for rendering the mirrored scene
+  // The color attachment of this framebuffer will then be sampled from
+  void prepareOffscreenFramebuffer(FrameBuffer* frameBuf,
+                                   VkFormat colorFormat,
+                                   VkFormat depthFormat) {
+    // Color attachment
+    VkImageCreateInfo image = vks::initializers::imageCreateInfo();
+    image.imageType = VK_IMAGE_TYPE_2D;
+    image.format = colorFormat;
+    image.extent.width = FB_DIM;
+    image.extent.height = FB_DIM;
+    image.extent.depth = 1;
+    image.mipLevels = 1;
+    image.arrayLayers = 1;
+    image.samples = VK_SAMPLE_COUNT_1_BIT;
+    image.tiling = VK_IMAGE_TILING_OPTIMAL;
+    // We will sample directly from the color attachment
+    image.usage =
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkMemoryAllocateInfo memAlloc = vks::initializers::memoryAllocateInfo();
+    VkMemoryRequirements memReqs;
+
+    VkImageViewCreateInfo colorImageView =
+        vks::initializers::imageViewCreateInfo();
+    colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    colorImageView.format = colorFormat;
+    colorImageView.flags = 0;
+    colorImageView.subresourceRange = {};
+    colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorImageView.subresourceRange.baseMipLevel = 0;
+    colorImageView.subresourceRange.levelCount = 1;
+    colorImageView.subresourceRange.baseArrayLayer = 0;
+    colorImageView.subresourceRange.layerCount = 1;
+
+    VK_CHECK_RESULT(
+        vkCreateImage(device_, &image, nullptr, &frameBuf->color.image));
+    vkGetImageMemoryRequirements(device_, frameBuf->color.image, &memReqs);
+    memAlloc.allocationSize = memReqs.size;
+    memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(
+        memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CHECK_RESULT(
+        vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->color.mem));
+    VK_CHECK_RESULT(vkBindImageMemory(device_, frameBuf->color.image,
+                                      frameBuf->color.mem, 0));
+
+    colorImageView.image = frameBuf->color.image;
+    VK_CHECK_RESULT(vkCreateImageView(device_, &colorImageView, nullptr,
+                                      &frameBuf->color.view));
+
+    // Depth stencil attachment
+    image.format = depthFormat;
+    image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    VkImageViewCreateInfo depthStencilView =
+        vks::initializers::imageViewCreateInfo();
+    depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    depthStencilView.format = depthFormat;
+    depthStencilView.flags = 0;
+    depthStencilView.subresourceRange = {};
+    depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (vks::tools::formatHasStencil(depthFormat)) {
+      depthStencilView.subresourceRange.aspectMask |=
+          VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    depthStencilView.subresourceRange.baseMipLevel = 0;
+    depthStencilView.subresourceRange.levelCount = 1;
+    depthStencilView.subresourceRange.baseArrayLayer = 0;
+    depthStencilView.subresourceRange.layerCount = 1;
+
+    VK_CHECK_RESULT(
+        vkCreateImage(device_, &image, nullptr, &frameBuf->depth.image));
+    vkGetImageMemoryRequirements(device_, frameBuf->depth.image, &memReqs);
+    memAlloc.allocationSize = memReqs.size;
+    memAlloc.memoryTypeIndex = vulkanDevice_->getMemoryType(
+        memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VK_CHECK_RESULT(
+        vkAllocateMemory(device_, &memAlloc, nullptr, &frameBuf->depth.mem));
+    VK_CHECK_RESULT(vkBindImageMemory(device_, frameBuf->depth.image,
+                                      frameBuf->depth.mem, 0));
+
+    depthStencilView.image = frameBuf->depth.image;
+    VK_CHECK_RESULT(vkCreateImageView(device_, &depthStencilView, nullptr,
+                                      &frameBuf->depth.view));
+
+    VkImageView attachments[2]{frameBuf->color.view, frameBuf->depth.view};
+
+    VkFramebufferCreateInfo fbufCreateInfo =
+        vks::initializers::framebufferCreateInfo();
+    fbufCreateInfo.renderPass = offscreenPass_.renderPass;
+    fbufCreateInfo.attachmentCount = 2;
+    fbufCreateInfo.pAttachments = attachments;
+    fbufCreateInfo.width = FB_DIM;
+    fbufCreateInfo.height = FB_DIM;
+    fbufCreateInfo.layers = 1;
+
+    VK_CHECK_RESULT(vkCreateFramebuffer(device_, &fbufCreateInfo, nullptr,
+                                        &frameBuf->framebuffer));
+
+    // Fill a descriptor for later use in a descriptor set
+    frameBuf->descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    frameBuf->descriptor.imageView = frameBuf->color.view;
+    frameBuf->descriptor.sampler = offscreenPass_.sampler;
   }
 
   // (A.3)
   void setupDescriptors() {
     // Pool
+    // BUG: Magic numbers 8, 6, 4, up ahead. Removing them causes runtime error.
     std::vector<VkDescriptorPoolSize> poolSizes = {
         vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                              MAX_CONCURRENT_FRAMES),
+                                              MAX_CONCURRENT_FRAMES * 8),
         vks::initializers::descriptorPoolSize(
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_CONCURRENT_FRAMES)};
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            MAX_CONCURRENT_FRAMES * 6)};
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(poolSizes,
-                                                    MAX_CONCURRENT_FRAMES);
+                                                    MAX_CONCURRENT_FRAMES * 4);
     VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
                                            nullptr, &descriptorPool_));
 
     // Layout
+    // Blackhole
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
         // Binding 0 : Fragment shader blackhole uniform buffer
         vks::initializers::descriptorSetLayoutBinding(
@@ -147,10 +409,27 @@ class VulkanExample : public VulkanExampleBase {
             VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 2)};
 
-    VkDescriptorSetLayoutCreateInfo descriptorLayout =
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI =
+        vks::initializers::descriptorSetLayoutCreateInfo(
+            setLayoutBindings.data(),
+            static_cast<uint32_t>(setLayoutBindings.size()));
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.blackhole));
+
+    // Bloom
+    setLayoutBindings = {
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT,
+            0),  // Binding 0 : Vertex shader uniform buffer
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, 1)};
+    descriptorSetLayoutCI =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
-        device_, &descriptorLayout, nullptr, &descriptorSetLayouts_.blackhole));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI,
+                                                nullptr,
+                                                &descriptorSetLayouts_.bloom));
 
     // Image descriptor for the cube map texture
     VkDescriptorImageInfo textureDescriptor =
@@ -162,23 +441,43 @@ class VulkanExample : public VulkanExampleBase {
             colorMap_.sampler, colorMap_.view, colorMap_.imageLayout);
 
     for (auto i = 0; i < uniformBuffers_.size(); i++) {
+      // Descriptor for blackhole
       VkDescriptorSetAllocateInfo allocInfo =
           vks::initializers::descriptorSetAllocateInfo(
               descriptorPool_, &descriptorSetLayouts_.blackhole, 1);
-      VK_CHECK_RESULT(
-          vkAllocateDescriptorSets(device_, &allocInfo, &descriptorSet_[i]));
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].blackhole));
       std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
-              descriptorSet_[i], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
-              &uniformBuffers_[i].descriptor),
+              descriptorSets_[i].blackhole, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              0, &uniformBuffers_[i].blackhole.descriptor),
           vks::initializers::writeDescriptorSet(
-              descriptorSet_[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
-              &textureDescriptor),
+              descriptorSets_[i].blackhole,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor),
           vks::initializers::writeDescriptorSet(
-              descriptorSet_[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2,
+              descriptorSets_[i].blackhole,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2,
               &blackholeColorTextureDescriptor),
       };
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
 
+      // Descriptor for bloom
+      VkDescriptorSetAllocateInfo descriptorSetAllocInfo =
+          vks::initializers::descriptorSetAllocateInfo(
+              descriptorPool_, &descriptorSetLayouts_.bloom, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &descriptorSetAllocInfo,
+                                               &descriptorSets_[i].bloom));
+      writeDescriptorSets = {
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].bloom, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+              &uniformBuffers_[i].bloom.descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].bloom,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+              &offscreenPass_.framebuffers.descriptor),
+      };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
@@ -263,20 +562,20 @@ class VulkanExample : public VulkanExampleBase {
 
   // (B.1)
   void updateUniformBuffers() {
-    uniformData_.cameraView = camera_.matrices_.view;
-    uniformData_.cameraPos = camera_.position_;
-    uniformData_.time =
+    ubos_.blackhole.cameraView = camera_.matrices_.view;
+    ubos_.blackhole.cameraPos = camera_.position_;
+    ubos_.blackhole.time =
         std::chrono::duration<double>(
             std::chrono::high_resolution_clock::now().time_since_epoch())
             .count();
-    uniformData_.resolution = glm::vec2(width_, height_);
-    uniformData_.showBlackhole = showBlackholeUI;
-    uniformData_.gravatationalLensingEnabled = gravatationalLensingEnabled;
-    uniformData_.accDiskEnabled = accDiskEnabled;
-    uniformData_.accDiskParticleEnabled = accDiskParticleEnabled;
+    ubos_.blackhole.resolution = glm::vec2(width_, height_);
+    ubos_.blackhole.showBlackhole = showBlackholeUI;
+    ubos_.blackhole.gravatationalLensingEnabled = gravatationalLensingEnabled;
+    ubos_.blackhole.accDiskEnabled = accDiskEnabled;
+    ubos_.blackhole.accDiskParticleEnabled = accDiskParticleEnabled;
 
-    memcpy(uniformBuffers_[currentBuffer_].mapped, &uniformData_,
-           sizeof(uniformData_));
+    memcpy(uniformBuffers_[currentBuffer_].blackhole.mapped, &ubos_.blackhole,
+           sizeof(BlackholeUBO));
   }
 
   // (B.2)
@@ -312,9 +611,9 @@ class VulkanExample : public VulkanExampleBase {
     VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayouts_.blackhole, 0, 1,
-                            &descriptorSet_[currentBuffer_], 0, nullptr);
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.blackhole,
+        0, 1, &descriptorSets_[currentBuffer_].blackhole, 0, nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.blackhole);
@@ -334,23 +633,23 @@ class VulkanExample : public VulkanExampleBase {
                         &gravatationalLensingEnabled);
       overlay->checkBox("Accretion Disk Enabled", &accDiskEnabled);
       overlay->checkBox("Disk Particles Enabled", &accDiskParticleEnabled);
-      overlay->sliderFloat("Accretion Disk Height", &uniformData_.accDiskHeight,
-                           0.0, 1.0);
-      overlay->sliderFloat("Accretion Disk Intensity", &uniformData_.accDiskLit,
-                           0.0, 1.0);
+      overlay->sliderFloat("Accretion Disk Height",
+                           &ubos_.blackhole.accDiskHeight, 0.0, 1.0);
+      overlay->sliderFloat("Accretion Disk Intensity",
+                           &ubos_.blackhole.accDiskLit, 0.0, 1.0);
       overlay->sliderFloat("Accretion Disk Density V",
-                           &uniformData_.accDiskDensityV, 0.0, 3.0);
+                           &ubos_.blackhole.accDiskDensityV, 0.0, 3.0);
       overlay->sliderFloat("Accretion Disk Density H",
-                           &uniformData_.accDiskDensityH, 0.0, 5.0);
+                           &ubos_.blackhole.accDiskDensityH, 0.0, 5.0);
       overlay->sliderFloat("Accretion Disk Noise Scale",
-                           &uniformData_.accDiskNoiseScale, 0.1, 5.0);
-      overlay->sliderInt("Accretion Disk LOD", &uniformData_.accDiskNoiseLOD, 0,
-                         10);
-      overlay->sliderFloat("Accretion Disk Speed", &uniformData_.accDiskSpeed,
-                           0.0, 2.0);
+                           &ubos_.blackhole.accDiskNoiseScale, 0.1, 5.0);
+      overlay->sliderInt("Accretion Disk LOD", &ubos_.blackhole.accDiskNoiseLOD,
+                         0, 10);
+      overlay->sliderFloat("Accretion Disk Speed",
+                           &ubos_.blackhole.accDiskSpeed, 0.0, 2.0);
 
-      overlay->sliderFloat("Exposure", &uniformData_.exposure, 0.1, 10.0);
-      overlay->sliderFloat("Gamma", &uniformData_.gamma, 1.0, 4.0);
+      overlay->sliderFloat("Exposure", &ubos_.blackhole.exposure, 0.1, 10.0);
+      overlay->sliderFloat("Gamma", &ubos_.blackhole.gamma, 1.0, 4.0);
     }
   }
 
@@ -912,7 +1211,7 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blackhole,
                                    nullptr);
       for (auto& buffer : uniformBuffers_) {
-        buffer.destroy();
+        buffer.blackhole.destroy();
       }
     }
   }
