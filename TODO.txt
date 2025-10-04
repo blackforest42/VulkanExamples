@@ -1,22 +1,5 @@
 Oct 2
 
-How to send framebuffers as textures into other pipelines:
+- finish debugging UBO Bloom not being set in the frag shader
+- mip mapping
 
-1. When setting up descriptor sets for the stage, the incoming framebuffer is bound by id as a texture:
-
-      std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-
-          vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].blurVert,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*bind id*/ 1,
-              &offscreenPass_.framebuffers[0].descriptor),
-      };
-
-In this case it is `offscreenPass_.framebuffers[0].framebuffer`
-
-2. During rendering (command buffering), the blackhole drawing stage must set the same framebuffer as a destination:
-
-      renderPassBeginInfo.framebuffer = offscreenPass_.framebuffers[0].framebuffer;
-
-
-Skip mipmapping for now. Down/up sample at level=0 (source image) for now.
