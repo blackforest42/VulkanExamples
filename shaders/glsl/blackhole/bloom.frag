@@ -16,6 +16,9 @@ layout (location = 0) out vec4 outFragColor;
 
 void main() 
 {
+	//outFragColor = vec4(0, 0, 1.f, 1.0);
+	//return;
+
 	vec3 fragColor = texture(samplerColor, inUV).rgb;
 	// Tonemapping
 	fragColor = vec3(1.0) - exp(-fragColor * ubo.exposure);

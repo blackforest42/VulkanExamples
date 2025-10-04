@@ -143,6 +143,7 @@ class VulkanExample : public VulkanExampleBase {
   // Prepare and initialize uniform buffer containing shader uniforms
   void prepareUniformBuffers() {
     for (auto& buffer : uniformBuffers_) {
+      // Blackhole
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -150,6 +151,7 @@ class VulkanExample : public VulkanExampleBase {
           &buffer.blackhole, sizeof(BlackholeUBO), &ubos_.blackhole));
       VK_CHECK_RESULT(buffer.blackhole.map());
 
+      // Bloom
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -509,7 +511,7 @@ class VulkanExample : public VulkanExampleBase {
             VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
     VkPipelineRasterizationStateCreateInfo rasterizationState =
         vks::initializers::pipelineRasterizationStateCreateInfo(
-            VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+            VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE,
             VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
     VkPipelineColorBlendAttachmentState blendAttachmentState =
         vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
@@ -610,9 +612,9 @@ class VulkanExample : public VulkanExampleBase {
     ubos_.blackhole.gravatationalLensingEnabled = gravatationalLensingEnabled;
     ubos_.blackhole.accDiskEnabled = accDiskEnabled;
     ubos_.blackhole.accDiskParticleEnabled = accDiskParticleEnabled;
-
     memcpy(uniformBuffers_[currentBuffer_].blackhole.mapped, &ubos_.blackhole,
            sizeof(BlackholeUBO));
+
     memcpy(uniformBuffers_[currentBuffer_].bloom.mapped, &ubos_.bloom,
            sizeof(BloomUBO));
   }
@@ -667,7 +669,7 @@ class VulkanExample : public VulkanExampleBase {
     // Bloom
     {
       VkClearValue clearValues[2]{};
-      clearValues[0].color = {0.f, 1.0f, 0};
+      clearValues[0].color = {0.f, 0.0f, 0.0f};
       clearValues[1].depthStencil = {1.0f, 0};
 
       VkRenderPassBeginInfo renderPassBeginInfo =
