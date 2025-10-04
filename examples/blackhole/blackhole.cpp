@@ -27,6 +27,8 @@ class VulkanExample : public VulkanExampleBase {
   vks::Texture cubeMap_{};
   vks::Texture colorMap_{};
 
+  // Hacky workaround.
+  // Boolean uniforms don't work in shaders for some reason.
   bool showBlackholeUI = true;
   bool gravatationalLensingEnabled = true;
   bool accDiskEnabled = true;
@@ -56,8 +58,8 @@ class VulkanExample : public VulkanExampleBase {
 
   struct BloomUBO {
     // Tonemapping
-    float exposure{1.0f};
-    float gamma{2.2f};
+    alignas(4) float exposure{1.0f};
+    alignas(4) float gamma{2.2f};
   };
 
   struct {
@@ -278,8 +280,6 @@ class VulkanExample : public VulkanExampleBase {
                                 fbDepthFormat);
   }
 
-  // (A.4) Setup the offscreen framebuffer for rendering the mirrored scene
-  // The color attachment of this framebuffer will then be sampled from
   void prepareOffscreenFramebuffer(FrameBuffer* frameBuf,
                                    VkFormat colorFormat,
                                    VkFormat depthFormat) {
@@ -383,7 +383,7 @@ class VulkanExample : public VulkanExampleBase {
     frameBuf->descriptor.sampler = offscreenPass_.sampler;
   }
 
-  // (A.3)
+  // (A.4)
   void setupDescriptors() {
     // Pool
     // BUG: Magic numbers 8, 6, 4, up ahead. Removing them causes runtime error.
@@ -492,7 +492,7 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
-  // (A.4)
+  // (A.5)
   void preparePipelines() {
     // Layout
     VkPipelineLayoutCreateInfo pipelineLayoutCI =
@@ -607,7 +607,8 @@ class VulkanExample : public VulkanExampleBase {
         std::chrono::duration<double>(
             std::chrono::high_resolution_clock::now().time_since_epoch())
             .count();
-    ubos_.blackhole.resolution = glm::vec2(width_, height_);
+    ubos_.blackhole.resolution =
+        glm::vec2(offscreenPass_.width, offscreenPass_.height);
     ubos_.blackhole.showBlackhole = showBlackholeUI;
     ubos_.blackhole.gravatationalLensingEnabled = gravatationalLensingEnabled;
     ubos_.blackhole.accDiskEnabled = accDiskEnabled;

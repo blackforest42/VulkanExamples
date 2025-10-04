@@ -6,10 +6,12 @@
 layout (location = 0) out vec2 outUV;
 
 vec2 positions[6] = vec2[](
+    // bottom left tri
     vec2(-1, -1),
     vec2(-1, 1),
     vec2(1, 1),
 
+    // top right tri
     vec2(1, 1),
     vec2(1, -1),
     vec2(-1, -1)
