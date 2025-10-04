@@ -19,7 +19,8 @@
 #include "stb_image.h"
 
 // Offscreen frame buffer properties
-#define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
+// #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
+#define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_UNORM
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -428,8 +429,8 @@ class VulkanExample : public VulkanExampleBase {
     // Bloom
     setLayoutBindings = {
         vks::initializers::descriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT,
-            0),  // Binding 0 : Vertex shader uniform buffer
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),  // Binding 0 : Fragment shader uniform buffer
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 1)};
