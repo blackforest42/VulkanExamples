@@ -633,11 +633,10 @@ class VulkanExample : public VulkanExampleBase {
 
       VkRenderPassBeginInfo renderPassBeginInfo =
           vks::initializers::renderPassBeginInfo();
-      renderPassBeginInfo.renderPass = renderPass_;
-      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
-      //  renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
-      //  renderPassBeginInfo.framebuffer =
-      //  offscreenPass_.framebuffers.framebuffer;
+      // renderPassBeginInfo.renderPass = renderPass_;
+      // renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+      renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+      renderPassBeginInfo.framebuffer = offscreenPass_.framebuffers.framebuffer;
       renderPassBeginInfo.renderArea.extent.width = width_;
       renderPassBeginInfo.renderArea.extent.height = height_;
       renderPassBeginInfo.clearValueCount = 2;
@@ -665,46 +664,42 @@ class VulkanExample : public VulkanExampleBase {
       vkCmdEndRenderPass(cmdBuffer);
     }
 
-    /*
-        // Bloom
-            {
-              VkClearValue clearValues[2]{};
-              clearValues[0].color = {1.f, 0, 0};
-              clearValues[1].depthStencil = {1.0f, 0};
+    // Bloom
+    {
+      VkClearValue clearValues[2]{};
+      clearValues[0].color = {0.f, 1.0f, 0};
+      clearValues[1].depthStencil = {1.0f, 0};
 
-              VkRenderPassBeginInfo renderPassBeginInfo =
-                  vks::initializers::renderPassBeginInfo();
-              renderPassBeginInfo.renderPass = renderPass_;
-              renderPassBeginInfo.framebuffer =
-       frameBuffers_[currentImageIndex_];
-              renderPassBeginInfo.renderArea.offset.x = 0;
-              renderPassBeginInfo.renderArea.offset.y = 0;
-              renderPassBeginInfo.renderArea.extent.width = width_;
-              renderPassBeginInfo.renderArea.extent.height = height_;
-              renderPassBeginInfo.clearValueCount = 2;
-              renderPassBeginInfo.pClearValues = clearValues;
+      VkRenderPassBeginInfo renderPassBeginInfo =
+          vks::initializers::renderPassBeginInfo();
+      renderPassBeginInfo.renderPass = renderPass_;
+      renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+      renderPassBeginInfo.renderArea.offset.x = 0;
+      renderPassBeginInfo.renderArea.offset.y = 0;
+      renderPassBeginInfo.renderArea.extent.width = width_;
+      renderPassBeginInfo.renderArea.extent.height = height_;
+      renderPassBeginInfo.clearValueCount = 2;
+      renderPassBeginInfo.pClearValues = clearValues;
 
-              vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                                   VK_SUBPASS_CONTENTS_INLINE);
-              VkViewport viewport = vks::initializers::viewport(
-                  (float)width_, (float)height_, 0.0f, 1.0f);
-              vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+      VkViewport viewport = vks::initializers::viewport(
+          (float)width_, (float)height_, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
-              VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0,
-       0); vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+      VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-              vkCmdBindDescriptorSets(
-                  cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-           pipelineLayouts_.bloom, 0, 1, &descriptorSets_[currentBuffer_].bloom,
-       0, nullptr);
+      vkCmdBindDescriptorSets(
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.bloom, 0,
+          1, &descriptorSets_[currentBuffer_].bloom, 0, nullptr);
 
-              vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                pipelines_.bloom);
-              vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
-              drawUI(cmdBuffer);
-              vkCmdEndRenderPass(cmdBuffer);
-            }
-        */
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines_.bloom);
+      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+      drawUI(cmdBuffer);
+      vkCmdEndRenderPass(cmdBuffer);
+    }
     VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
   }
 

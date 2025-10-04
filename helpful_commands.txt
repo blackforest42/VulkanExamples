@@ -1,7 +1,10 @@
 # Compile shaders
-glslc blackhole.vert -o blackhole.vert.spv
 
+glslc blackhole.vert -o blackhole.vert.spv
 glslc blackhole.frag -o blackhole.frag.spv
+
+glslc bloom.vert -o bloom.vert.spv
+glslc bloom.frag -o bloom.frag.spv
 
 
 # Use `toktx` to create a .ktx cubemap from 6 .png files
