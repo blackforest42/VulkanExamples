@@ -389,11 +389,12 @@ class VulkanExample : public VulkanExampleBase {
     // Pool
     // BUG: Magic numbers 8, 6, 4, up ahead. Removing them causes runtime error.
     std::vector<VkDescriptorPoolSize> poolSizes = {
-        vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                              MAX_CONCURRENT_FRAMES * 8),
+        vks::initializers::descriptorPoolSize(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 8),
         vks::initializers::descriptorPoolSize(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            MAX_CONCURRENT_FRAMES * 6)};
+            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 6)};
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(poolSizes,
                                                     MAX_CONCURRENT_FRAMES * 4);
