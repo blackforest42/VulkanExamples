@@ -34,7 +34,7 @@ layout (binding = 2) uniform sampler2D colorMap;
 const float PI = 3.14159265359;
 const float EPSILON = 0.0001;
 const float INFINITY = 1000000.0;
-const int SAMPLES_PER_PIXEL = 300;
+const int MAX_STEP_SIZE = 1000;
 
 // For debugging
 struct Ring {
@@ -66,6 +66,8 @@ float sqrLength(vec3 a);
 void accDiskColor(vec3 pos, inout vec3 color, inout float alpha);
 vec3 traceColor(vec3 pos, vec3 dir);
 
+////////////////////// main /////////////////////////////////////////////////
+
 void main() {
 
     vec2 uv = gl_FragCoord.xy / ubo.resolution.xy - vec2(0.5);
@@ -84,8 +86,112 @@ void main() {
 	outFragColor.rgb = hdrColor;
 }
 
-
 ///////////////////////////////////////////////////////////////////////
+
+
+void accDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
+  float innerRadius = 2.6;
+  float outerRadius = 12.0;
+
+  // Density linearly decreases as the distance to the blackhole center
+  // increases.
+  float density = max(
+      0.0, 1.0 - length(pos.xyz / vec3(outerRadius, ubo.accDiskHeight, outerRadius)));
+  if (density < 0.001) {
+    return;
+  }
+
+  density *= pow(1.0 - abs(pos.y) / ubo.accDiskHeight, ubo.accDiskDensityV);
+
+  // Set particale density to 0 when radius is below the inner most stable
+  // circular orbit.
+  density *= smoothstep(innerRadius, innerRadius * 1.1, length(pos));
+
+  // Avoid the shader computation when density is very small.
+  if (density < 0.001) {
+    return;
+  }
+
+  vec3 sphericalCoord = toSpherical(pos);
+
+  // Scale the rho and phi so that the particales appear to be at the correct
+  // scale visually.
+  sphericalCoord.y *= 2.0;
+  sphericalCoord.z *= 4.0;
+
+  density *= 1.0 / pow(sphericalCoord.x, ubo.accDiskDensityH);
+  density *= 16000.0;
+
+  if (ubo.accDiskParticleEnabled == 0) {
+    // RGB values for "Vanilla" color
+    color += vec3(.953, .898, .671) * density * 0.02;
+    return;
+  }
+
+  float noise = 1.0;
+  for (int i = 0; i < int(ubo.accDiskNoiseLOD); i++) {
+    noise *= 0.5 * snoise(sphericalCoord * pow(i, 2) * ubo.accDiskNoiseScale) + 0.5;
+    if (i % 2 == 0) {
+      sphericalCoord.y += ubo.time * ubo.accDiskSpeed;
+    } else {
+      sphericalCoord.y -= ubo.time * ubo.accDiskSpeed;
+    }
+  }
+
+  vec3 dustColor =
+      texture(colorMap, vec2(sphericalCoord.x / outerRadius, 0.5)).rgb;
+
+  color += density * ubo.accDiskLit * dustColor * alpha * abs(noise);
+}
+
+vec3 traceColor(vec3 pos, vec3 dir) {
+  vec3 color = vec3(0.0);
+  float alpha = 1.0;
+
+  float STEP_SIZE = 0.1;
+  dir *= STEP_SIZE;
+
+  // Initial values
+  vec3 h = cross(pos, dir);
+  float h2 = dot(h, h);
+
+  for (int i = 0; i < MAX_STEP_SIZE; i++) {
+      // If gravatational lensing is applied
+      if (ubo.gravatationalLensingEnabled > 0.5) {
+        vec3 acc = accel(h2, pos);
+        dir += acc;
+      }
+
+      // Reach event horizon
+      if (dot(pos, pos) < 1.0) {
+        return color;
+      }
+
+      float minDistance = INFINITY;
+
+      // For debugging
+      if (false) {
+        Ring ring;
+        ring.center = vec3(0.0, 0.05, 0.0);
+        ring.normal = vec3(0.0, 1.0, 0.0);
+        ring.innerRadius = 2.0;
+        ring.outerRadius = 6.0;
+        ring.rotateSpeed = 0.08;
+        ringColor(pos, dir, ring, minDistance, color);
+      } else {
+        if (ubo.accDiskEnabled > 0.5) {
+          accDiskColor(pos, color, alpha);
+        }
+      }
+    pos += dir;
+  }
+
+  // Sample skybox color
+  dir = rotateVector(dir, vec3(0.0, 1.0, 0.0), ubo.time);
+  color += texture(galaxyCubemap, dir).rgb * alpha;
+  return color;
+}
+
 
 ///----
 /// Simplex 3D Noise
@@ -282,106 +388,3 @@ void ringColor(vec3 rayOrigin,
 float sqrLength(vec3 a) {
   return dot(a, a);
 }
-
-void accDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
-  float innerRadius = 2.6;
-  float outerRadius = 12.0;
-
-  // Density linearly decreases as the distance to the blackhole center
-  // increases.
-  float density = max(
-      0.0, 1.0 - length(pos.xyz / vec3(outerRadius, ubo.accDiskHeight, outerRadius)));
-  if (density < 0.001) {
-    return;
-  }
-
-  density *= pow(1.0 - abs(pos.y) / ubo.accDiskHeight, ubo.accDiskDensityV);
-
-  // Set particale density to 0 when radius is below the inner most stable
-  // circular orbit.
-  density *= smoothstep(innerRadius, innerRadius * 1.1, length(pos));
-
-  // Avoid the shader computation when density is very small.
-  if (density < 0.001) {
-    return;
-  }
-
-  vec3 sphericalCoord = toSpherical(pos);
-
-  // Scale the rho and phi so that the particales appear to be at the correct
-  // scale visually.
-  sphericalCoord.y *= 2.0;
-  sphericalCoord.z *= 4.0;
-
-  density *= 1.0 / pow(sphericalCoord.x, ubo.accDiskDensityH);
-  density *= 16000.0;
-
-  if (ubo.accDiskParticleEnabled == 0) {
-    color += vec3(.953, .898, .671) * density * 0.02;
-    return;
-  }
-
-  float noise = 1.0;
-  for (int i = 0; i < int(ubo.accDiskNoiseLOD); i++) {
-    noise *= 0.5 * snoise(sphericalCoord * pow(i, 2) * ubo.accDiskNoiseScale) + 0.5;
-    if (i % 2 == 0) {
-      sphericalCoord.y += ubo.time * ubo.accDiskSpeed;
-    } else {
-      sphericalCoord.y -= ubo.time * ubo.accDiskSpeed;
-    }
-  }
-
-  vec3 dustColor =
-      texture(colorMap, vec2(sphericalCoord.x / outerRadius, 0.5)).rgb;
-
-  color += density * ubo.accDiskLit * dustColor * alpha * abs(noise);
-}
-
-vec3 traceColor(vec3 pos, vec3 dir) {
-  vec3 color = vec3(0.0);
-  float alpha = 1.0;
-
-  float STEP_SIZE = 0.1;
-  dir *= STEP_SIZE;
-
-  // Initial values
-  vec3 h = cross(pos, dir);
-  float h2 = dot(h, h);
-
-  for (int i = 0; i < SAMPLES_PER_PIXEL; i++) {
-      // If gravatational lensing is applied
-      if (ubo.gravatationalLensingEnabled > 0.5) {
-        vec3 acc = accel(h2, pos);
-        dir += acc;
-      }
-
-      // Reach event horizon
-      if (dot(pos, pos) < 1.0) {
-        return color;
-      }
-
-      float minDistance = INFINITY;
-
-      // For debugging
-      if (false) {
-        Ring ring;
-        ring.center = vec3(0.0, 0.05, 0.0);
-        ring.normal = vec3(0.0, 1.0, 0.0);
-        ring.innerRadius = 2.0;
-        ring.outerRadius = 6.0;
-        ring.rotateSpeed = 0.08;
-        ringColor(pos, dir, ring, minDistance, color);
-      } else {
-        if (ubo.accDiskEnabled > 0.5) {
-          accDiskColor(pos, color, alpha);
-        }
-      }
-    pos += dir;
-  }
-
-  // Sample skybox color
-  dir = rotateVector(dir, vec3(0.0, 1.0, 0.0), ubo.time);
-  color += texture(galaxyCubemap, dir).rgb * alpha;
-  return color;
-}
-
