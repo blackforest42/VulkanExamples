@@ -1,5 +1,4 @@
-Oct 2
-
-- finish debugging UBO Bloom not being set in the frag shader
-- mip mapping
+Oct 6
+- create mipmap chain, render it to screen
+- bloom chain
 
