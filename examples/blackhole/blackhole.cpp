@@ -57,7 +57,7 @@ class VulkanExample : public VulkanExampleBase {
     float accDiskSpeed{0.5};
   };
 
-  struct BloomUBO {
+  struct BlendUBO {
     // Tonemapping
     alignas(4) int tonemappingEnabled;
     alignas(4) float exposure{1.0f};
@@ -65,32 +65,32 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     BlackholeUBO blackhole;
-    BloomUBO bloom;
+    BlendUBO blend;
   } ubos_;
 
   struct UniformBuffers {
-    vks::Buffer bloom;
+    vks::Buffer blend;
     vks::Buffer blackhole;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
 
   struct {
-    VkPipelineLayout bloom;
+    VkPipelineLayout blend;
     VkPipelineLayout blackhole;
   } pipelineLayouts_;
 
   struct {
-    VkPipeline bloom;
+    VkPipeline blend;
     VkPipeline blackhole;
   } pipelines_;
 
   struct {
-    VkDescriptorSetLayout bloom;
+    VkDescriptorSetLayout blend;
     VkDescriptorSetLayout blackhole;
   } descriptorSetLayouts_{};
 
   struct DescriptorSets {
-    VkDescriptorSet bloom;
+    VkDescriptorSet blend;
     VkDescriptorSet blackhole;
   };
   std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
@@ -111,7 +111,7 @@ class VulkanExample : public VulkanExampleBase {
     VkRenderPass renderPass;
     VkSampler sampler;
     FrameBuffer framebuffers;
-  } offscreenPass_{};  // Handles the bloom pass
+  } offscreenPass_{};  // Handles the blend pass
 
   VulkanExample() : VulkanExampleBase() {
     title = "Blackhole";
@@ -155,13 +155,13 @@ class VulkanExample : public VulkanExampleBase {
           &buffer.blackhole, sizeof(BlackholeUBO), &ubos_.blackhole));
       VK_CHECK_RESULT(buffer.blackhole.map());
 
-      // Bloom
+      // Blend
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-          &buffer.bloom, sizeof(BloomUBO), &ubos_.bloom));
-      VK_CHECK_RESULT(buffer.bloom.map());
+          &buffer.blend, sizeof(BlendUBO), &ubos_.blend));
+      VK_CHECK_RESULT(buffer.blend.map());
     }
   }
 
@@ -428,7 +428,7 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.blackhole));
 
-    // Bloom
+    // Blend
     setLayoutBindings = {
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -440,7 +440,7 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI,
                                                 nullptr,
-                                                &descriptorSetLayouts_.bloom));
+                                                &descriptorSetLayouts_.blend));
 
     // Image descriptor for the cube map texture
     VkDescriptorImageInfo textureDescriptor =
@@ -475,17 +475,17 @@ class VulkanExample : public VulkanExampleBase {
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
-      // Descriptor for bloom
+      // Descriptor for blend
       allocInfo = vks::initializers::descriptorSetAllocateInfo(
-          descriptorPool_, &descriptorSetLayouts_.bloom, 1);
+          descriptorPool_, &descriptorSetLayouts_.blend, 1);
       VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
-                                               &descriptorSets_[i].bloom));
+                                               &descriptorSets_[i].blend));
       writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].bloom, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-              /*binding id*/ 0, &uniformBuffers_[i].bloom.descriptor),
+              descriptorSets_[i].blend, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].blend.descriptor),
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].bloom,
+              descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
               &offscreenPass_.framebuffers.descriptor),
       };
@@ -504,9 +504,9 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.blackhole));
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
-        &descriptorSetLayouts_.bloom, 1);
+        &descriptorSetLayouts_.blend, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
-                                           &pipelineLayouts_.bloom));
+                                           &pipelineLayouts_.blend));
 
     // Pipeline
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
@@ -536,7 +536,7 @@ class VulkanExample : public VulkanExampleBase {
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
     VkGraphicsPipelineCreateInfo pipelineCI =
-        vks::initializers::pipelineCreateInfo(pipelineLayouts_.bloom,
+        vks::initializers::pipelineCreateInfo(pipelineLayouts_.blend,
                                               renderPass_, 0);
     pipelineCI.pInputAssemblyState = &inputAssemblyState;
     pipelineCI.pRasterizationState = &rasterizationState;
@@ -548,17 +548,17 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineCI.pStages = shaderStages.data();
 
-    // Bloom pipeline
-    shaderStages[0] = loadShader(getShadersPath() + "blackhole/bloom.vert.spv",
+    // Blend pipeline
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/blend.vert.spv",
                                  VK_SHADER_STAGE_VERTEX_BIT);
-    shaderStages[1] = loadShader(getShadersPath() + "blackhole/bloom.frag.spv",
+    shaderStages[1] = loadShader(getShadersPath() + "blackhole/blend.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // No vertex input
     VkPipelineVertexInputStateCreateInfo emptyInputState =
         vks::initializers::pipelineVertexInputStateCreateInfo();
     pipelineCI.pVertexInputState = &emptyInputState;
-    pipelineCI.layout = pipelineLayouts_.bloom;
+    pipelineCI.layout = pipelineLayouts_.blend;
 
     // Additive blending
     // blendAttachmentState.colorWriteMask = 0xF;
@@ -570,7 +570,7 @@ class VulkanExample : public VulkanExampleBase {
     // blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     // blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
-        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.bloom));
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.blend));
 
     // Blackhole pipeline
     pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
@@ -619,9 +619,9 @@ class VulkanExample : public VulkanExampleBase {
     memcpy(uniformBuffers_[currentBuffer_].blackhole.mapped, &ubos_.blackhole,
            sizeof(BlackholeUBO));
 
-    ubos_.bloom.tonemappingEnabled = toneMappingEnabled;
-    memcpy(uniformBuffers_[currentBuffer_].bloom.mapped, &ubos_.bloom,
-           sizeof(BloomUBO));
+    ubos_.blend.tonemappingEnabled = toneMappingEnabled;
+    memcpy(uniformBuffers_[currentBuffer_].blend.mapped, &ubos_.blend,
+           sizeof(BlendUBO));
   }
 
   // (B.2)
@@ -673,7 +673,7 @@ class VulkanExample : public VulkanExampleBase {
       vkCmdEndRenderPass(cmdBuffer);
     }
 
-    // Bloom
+    // Blend
     {
       VkClearValue clearValues[2]{};
       clearValues[0].color = {0.f, 1.0f, 0.0f};
@@ -700,11 +700,11 @@ class VulkanExample : public VulkanExampleBase {
       vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
       vkCmdBindDescriptorSets(
-          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.bloom, 0,
-          1, &descriptorSets_[currentBuffer_].bloom, 0, nullptr);
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.blend, 0,
+          1, &descriptorSets_[currentBuffer_].blend, 0, nullptr);
 
       vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        pipelines_.bloom);
+                        pipelines_.blend);
       vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
       drawUI(cmdBuffer);
       vkCmdEndRenderPass(cmdBuffer);
@@ -735,7 +735,7 @@ class VulkanExample : public VulkanExampleBase {
                            &ubos_.blackhole.accDiskSpeed, 0.0, 2.0);
 
       overlay->checkBox("Tone Mapping Enabled", &toneMappingEnabled);
-      overlay->sliderFloat("Exposure", &ubos_.bloom.exposure, 0.1, 10.0);
+      overlay->sliderFloat("Exposure", &ubos_.blend.exposure, 0.1, 10.0);
     }
   }
 
@@ -1302,12 +1302,12 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroySampler(device_, cubeMap_.sampler, nullptr);
       vkFreeMemory(device_, cubeMap_.deviceMemory, nullptr);
       vkDestroyPipeline(device_, pipelines_.blackhole, nullptr);
-      vkDestroyPipeline(device_, pipelines_.bloom, nullptr);
+      vkDestroyPipeline(device_, pipelines_.blend, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.blackhole, nullptr);
-      vkDestroyPipelineLayout(device_, pipelineLayouts_.bloom, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.blend, nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blackhole,
                                    nullptr);
-      vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.bloom,
+      vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blend,
                                    nullptr);
       for (auto& buffer : uniformBuffers_) {
         buffer.blackhole.destroy();
