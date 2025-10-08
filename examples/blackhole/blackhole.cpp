@@ -1295,6 +1295,20 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
+  void destroyOffscreenPass() {
+    vkDestroyRenderPass(device_, offscreenPass_.renderPass, nullptr);
+    vkDestroyFramebuffer(device_, offscreenPass_.framebuffers.framebuffer,
+                         nullptr);
+  }
+
+  void windowResized() override {
+    destroyOffscreenPass();
+    prepareOffscreen();
+    vkResetDescriptorPool(device_, descriptorPool_, 0);
+    setupDescriptors();
+    resized_ = false;
+  }
+
   ~VulkanExample() {
     if (device_) {
       vkDestroyImageView(device_, cubeMap_.view, nullptr);
