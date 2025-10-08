@@ -601,28 +601,15 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] = loadShader(getShadersPath() + "blackhole/blend.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    // No vertex input
+    // No vertices to input, quad verts are hardcoded in vertex shader.
     VkPipelineVertexInputStateCreateInfo emptyInputState =
         vks::initializers::pipelineVertexInputStateCreateInfo();
     pipelineCI.pVertexInputState = &emptyInputState;
     pipelineCI.layout = pipelineLayouts_.blend;
-
-    // Additive blending
-    // blendAttachmentState.colorWriteMask = 0xF;
-    // blendAttachmentState.blendEnable = VK_TRUE;
-    // blendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-    // blendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    // blendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    // blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
-    // blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    // blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.blend));
 
     // Blackhole pipeline
-    pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
-        {vkglTF::VertexComponent::Position, vkglTF::VertexComponent::UV,
-         vkglTF::VertexComponent::Color, vkglTF::VertexComponent::Normal});
     pipelineCI.layout = pipelineLayouts_.blackhole;
     pipelineCI.renderPass = offscreenPass_.renderPass;
     shaderStages[0] =
@@ -637,6 +624,22 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.blackhole));
+
+    // Downsample pipeline
+    pipelineCI.layout = pipelineLayouts_.downsample;
+    pipelineCI.renderPass = offscreenPass_.renderPass;
+    shaderStages[0] =
+        loadShader(getShadersPath() + "blackhole/downsample.vert.spv",
+                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] =
+        loadShader(getShadersPath() + "blackhole/downsample.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    blendAttachmentState.blendEnable = VK_FALSE;
+    depthStencilState.depthWriteEnable = VK_TRUE;
+    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.downsample));
   }
 
   // (B) Called in VulkanExampleBase::renderLoop()

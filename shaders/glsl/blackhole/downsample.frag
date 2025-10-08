@@ -10,12 +10,12 @@
 // Remember to use edge clamping for this texture!
 layout (binding = 0) uniform UBO {
 uniform vec2 srcResolution;
-uniform int currentMipLevel;
+uniform int currentSampleLevel;
 uniform int karisAverageEnabled;
 } ubo;
 
 // Texture maps
-layout (binding = 1) uniform sampler2D srcTexture[6];
+layout (binding = 1) uniform sampler2D srcTextures[6];
 
 // out
 layout(location = 0) out vec3 downsample;
@@ -38,10 +38,16 @@ float KarisAverage(vec3 col) {
   // Formula is 1 / (1 + luma)
   float luma = sRGBToLuma(ToSRGB(col)) * 0.25f;
   return 1.0f / (1.0f + luma);
+}
 
-// NOTE: This is the readable version of this shader. It will be optimized!
 void main() {
-  vec2 srcTexelSize = 1.0 / srcResolution;
+    // gl_FragCoord is in window/pixel coordinates where (0,0) is bottom-left
+    // uv is in NDC, where (0,0) is the center
+    vec2 uv = gl_FragCoord.xy / ubo.srcResolution.xy - vec2(0.5);
+    // Aspect ratio correction for non-square screens
+	uv.x *= ubo.srcResolution.x / ubo.srcResolution.y;
+
+  vec2 srcTexelSize = 1.0 / ubo.srcResolution;
   float x = srcTexelSize.x;
   float y = srcTexelSize.y;
 
@@ -53,25 +59,25 @@ void main() {
   // g - h - i
   // === ('e' is the current texel) ===
   vec3 a =
-      texture(srcTexture, vec2(texCoord.x - 2 * x, texCoord.y + 2 * y)).rgb;
-  vec3 b = texture(srcTexture, vec2(texCoord.x, texCoord.y + 2 * y)).rgb;
+      texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x - 2 * x, uv.y + 2 * y)).rgb;
+  vec3 b = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x, uv.y + 2 * y)).rgb;
   vec3 c =
-      texture(srcTexture, vec2(texCoord.x + 2 * x, texCoord.y + 2 * y)).rgb;
+      texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x + 2 * x, uv.y + 2 * y)).rgb;
 
-  vec3 d = texture(srcTexture, vec2(texCoord.x - 2 * x, texCoord.y)).rgb;
-  vec3 e = texture(srcTexture, vec2(texCoord.x, texCoord.y)).rgb;
-  vec3 f = texture(srcTexture, vec2(texCoord.x + 2 * x, texCoord.y)).rgb;
+  vec3 d = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x - 2 * x, uv.y)).rgb;
+  vec3 e = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x, uv.y)).rgb;
+  vec3 f = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x + 2 * x, uv.y)).rgb;
 
   vec3 g =
-      texture(srcTexture, vec2(texCoord.x - 2 * x, texCoord.y - 2 * y)).rgb;
-  vec3 h = texture(srcTexture, vec2(texCoord.x, texCoord.y - 2 * y)).rgb;
+      texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x - 2 * x, uv.y - 2 * y)).rgb;
+  vec3 h = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x, uv.y - 2 * y)).rgb;
   vec3 i =
-      texture(srcTexture, vec2(texCoord.x + 2 * x, texCoord.y - 2 * y)).rgb;
+      texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x + 2 * x, uv.y - 2 * y)).rgb;
 
-  vec3 j = texture(srcTexture, vec2(texCoord.x - x, texCoord.y + y)).rgb;
-  vec3 k = texture(srcTexture, vec2(texCoord.x + x, texCoord.y + y)).rgb;
-  vec3 l = texture(srcTexture, vec2(texCoord.x - x, texCoord.y - y)).rgb;
-  vec3 m = texture(srcTexture, vec2(texCoord.x + x, texCoord.y - y)).rgb;
+  vec3 j = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x - x, uv.y + y)).rgb;
+  vec3 k = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x + x, uv.y + y)).rgb;
+  vec3 l = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x - x, uv.y - y)).rgb;
+  vec3 m = texture(srcTextures[ubo.currentSampleLevel], vec2(uv.x + x, uv.y - y)).rgb;
 
   // Apply weighted distribution:
   // 0.5 + 0.125 + 0.125 + 0.125 + 0.125 = 1
@@ -89,7 +95,7 @@ void main() {
 
   // Check if we need to perform Karis average on each block of 4 samples
   vec3 groups[5];
-  if (mipLevel == 0) {
+  if (ubo.karisAverageEnabled == 0) {
     // We are writing to mip 0, so we need to apply Karis average to each
     // block of 4 samples to prevent fireflies (very bright subpixels, leads
     // to pulsating artifacts).
@@ -111,4 +117,4 @@ void main() {
     downsample += (b + d + f + h) * 0.0625;   // ok
     downsample += (j + k + l + m) * 0.125;    // ok
   }
-}}
+}
