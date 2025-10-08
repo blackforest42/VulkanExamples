@@ -21,6 +21,7 @@
 // Offscreen frame buffer properties
 // #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
+// Number of down/up samples during bloom
 constexpr int NUM_SAMPLE_SIZES = 6;
 
 class VulkanExample : public VulkanExampleBase {
@@ -35,6 +36,7 @@ class VulkanExample : public VulkanExampleBase {
   bool accDiskEnabled = true;
   bool accDiskParticleEnabled = true;
   bool toneMappingEnabled = true;
+  bool karisAverageEnabled = true;
 
   struct BlackholeUBO {
     alignas(16) glm::mat4 cameraView;
@@ -58,6 +60,12 @@ class VulkanExample : public VulkanExampleBase {
     float accDiskSpeed{0.5};
   };
 
+  struct DownsampleUBO {
+    glm::vec2 srcResolution;
+    int currentMipLevel;
+    int karisAverageEnabled;
+  };
+
   struct BlendUBO {
     // Tonemapping
     alignas(4) int tonemappingEnabled;
@@ -66,33 +74,39 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     BlackholeUBO blackhole;
+    DownsampleUBO downsample;
     BlendUBO blend;
   } ubos_;
 
   struct UniformBuffers {
-    vks::Buffer blend;
     vks::Buffer blackhole;
+    vks::Buffer downsample;
+    vks::Buffer blend;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
 
   struct {
-    VkPipelineLayout blend;
     VkPipelineLayout blackhole;
+    VkPipelineLayout downsample;
+    VkPipelineLayout blend;
   } pipelineLayouts_;
 
   struct {
-    VkPipeline blend;
     VkPipeline blackhole;
+    VkPipeline downsample;
+    VkPipeline blend;
   } pipelines_;
 
   struct {
-    VkDescriptorSetLayout blend;
     VkDescriptorSetLayout blackhole;
+    VkDescriptorSetLayout downsample;
+    VkDescriptorSetLayout blend;
   } descriptorSetLayouts_{};
 
   struct DescriptorSets {
-    VkDescriptorSet blend;
     VkDescriptorSet blackhole;
+    VkDescriptorSet downsample;
+    VkDescriptorSet blend;
   };
   std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
 
@@ -111,7 +125,10 @@ class VulkanExample : public VulkanExampleBase {
   struct OffscreenPass {
     VkRenderPass renderPass;
     VkSampler sampler;
-    std::array<FrameBuffer, NUM_SAMPLE_SIZES> framebuffers;
+    // Holds the first offscreen framebuffer
+    FrameBuffer original;
+    // Holds all downsampled framebuffers
+    std::array<FrameBuffer, NUM_SAMPLE_SIZES> samples;
   } offscreenPass_{};  // Handles the down/up sampling pass
 
   VulkanExample() : VulkanExampleBase() {
@@ -273,14 +290,20 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(
         vkCreateSampler(device_, &sampler, nullptr, &offscreenPass_.sampler));
 
+    // Generate framebuffer for first renderpass
+    offscreenPass_.original.height = height_;
+    offscreenPass_.original.width = width_;
+    prepareOffscreenFramebuffer(&offscreenPass_.original, FB_COLOR_FORMAT,
+                                fbDepthFormat);
+
     // Generate fb's for each level using mipmap scaling (1/2).
     for (int i = 0; i < NUM_SAMPLE_SIZES; i++) {
-      offscreenPass_.framebuffers[i].height =
+      offscreenPass_.samples[i].height =
           static_cast<uint32_t>(height_ * pow(0.5, i));
-      offscreenPass_.framebuffers[i].width =
+      offscreenPass_.samples[i].width =
           static_cast<uint32_t>(width_ * pow(0.5, i));
-      prepareOffscreenFramebuffer(&offscreenPass_.framebuffers[i],
-                                  FB_COLOR_FORMAT, fbDepthFormat);
+      prepareOffscreenFramebuffer(&offscreenPass_.samples[i], FB_COLOR_FORMAT,
+                                  fbDepthFormat);
     }
   }
 
@@ -404,8 +427,7 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
                                            nullptr, &descriptorPool_));
 
-    // Layout
-    // Blackhole
+    // Layout: Blackhole
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
         // Binding 0 : Fragment shader blackhole uniform buffer
         vks::initializers::descriptorSetLayoutBinding(
@@ -417,6 +439,7 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1),
+
         // Binding 2 : Fragment shader blackhole 2D texture
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -431,11 +454,32 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.blackhole));
 
-    // Blend
+    // Layout: Downsample
     setLayoutBindings = {
+        // Binding 0: uniform buffer
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-            /*binding id*/ 0),  // Binding 0 : Fragment shader uniform buffer
+            /*binding id*/ 0),
+
+        // Binding 1: array of down sized maps
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, NUM_SAMPLE_SIZES)};
+
+    descriptorSetLayoutCI =
+        vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.downsample));
+
+    // Layout: Blend
+    setLayoutBindings = {
+        // Binding 0 : uniform buffer for tonemappng
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),
+
+        // Binding 1 : Texture map
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, 1)};
@@ -490,7 +534,7 @@ class VulkanExample : public VulkanExampleBase {
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
-              &offscreenPass_.framebuffers[0].descriptor),
+              &offscreenPass_.original.descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -613,9 +657,8 @@ class VulkanExample : public VulkanExampleBase {
         std::chrono::duration<double>(
             std::chrono::high_resolution_clock::now().time_since_epoch())
             .count();
-    ubos_.blackhole.resolution =
-        glm::vec2(offscreenPass_.framebuffers[0].width,
-                  offscreenPass_.framebuffers[0].height);
+    ubos_.blackhole.resolution = glm::vec2(offscreenPass_.original.width,
+                                           offscreenPass_.original.height);
     ubos_.blackhole.showBlackhole = showBlackholeUI;
     ubos_.blackhole.gravatationalLensingEnabled = gravatationalLensingEnabled;
     ubos_.blackhole.accDiskEnabled = accDiskEnabled;
@@ -648,8 +691,7 @@ class VulkanExample : public VulkanExampleBase {
       // renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
       renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
 
-      // 0th fb is the largest and will be the one presented.
-      const VulkanExample::FrameBuffer& fb = offscreenPass_.framebuffers[0];
+      const VulkanExample::FrameBuffer& fb = offscreenPass_.original;
       renderPassBeginInfo.framebuffer = fb.framebuffer;
       renderPassBeginInfo.renderArea.extent.width = fb.width;
       renderPassBeginInfo.renderArea.extent.height = fb.height;
@@ -1302,8 +1344,9 @@ class VulkanExample : public VulkanExampleBase {
 
   void destroyOffscreenPass() {
     vkDestroyRenderPass(device_, offscreenPass_.renderPass, nullptr);
-    for (FrameBuffer framebuffer : offscreenPass_.framebuffers) {
-      vkDestroyFramebuffer(device_, framebuffer.framebuffer, nullptr);
+    vkDestroyFramebuffer(device_, offscreenPass_.original.framebuffer, nullptr);
+    for (FrameBuffer sample : offscreenPass_.samples) {
+      vkDestroyFramebuffer(device_, sample.framebuffer, nullptr);
     }
   }
 
@@ -1329,14 +1372,22 @@ class VulkanExample : public VulkanExampleBase {
                                    nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blend,
                                    nullptr);
-      for (auto& framebuffer : offscreenPass_.framebuffers) {
-        vkDestroyImageView(device_, framebuffer.color.view, nullptr);
-        vkDestroyImage(device_, framebuffer.color.image, nullptr);
-        vkFreeMemory(device_, framebuffer.color.mem, nullptr);
-        vkDestroyImageView(device_, framebuffer.depth.view, nullptr);
-        vkDestroyImage(device_, framebuffer.depth.image, nullptr);
-        vkFreeMemory(device_, framebuffer.depth.mem, nullptr);
-        vkDestroyFramebuffer(device_, framebuffer.framebuffer, nullptr);
+      vkDestroyImageView(device_, offscreenPass_.original.color.view, nullptr);
+      vkDestroyImage(device_, offscreenPass_.original.color.image, nullptr);
+      vkFreeMemory(device_, offscreenPass_.original.color.mem, nullptr);
+      vkDestroyImageView(device_, offscreenPass_.original.depth.view, nullptr);
+      vkDestroyImage(device_, offscreenPass_.original.depth.image, nullptr);
+      vkFreeMemory(device_, offscreenPass_.original.depth.mem, nullptr);
+      vkDestroyFramebuffer(device_, offscreenPass_.original.framebuffer,
+                           nullptr);
+      for (auto& sample : offscreenPass_.samples) {
+        vkDestroyImageView(device_, sample.color.view, nullptr);
+        vkDestroyImage(device_, sample.color.image, nullptr);
+        vkFreeMemory(device_, sample.color.mem, nullptr);
+        vkDestroyImageView(device_, sample.depth.view, nullptr);
+        vkDestroyImage(device_, sample.depth.image, nullptr);
+        vkFreeMemory(device_, sample.depth.mem, nullptr);
+        vkDestroyFramebuffer(device_, sample.framebuffer, nullptr);
       }
       for (auto& buffer : uniformBuffers_) {
         buffer.blackhole.destroy();

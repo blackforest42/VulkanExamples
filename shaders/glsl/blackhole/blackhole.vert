@@ -3,8 +3,6 @@
 // in
 layout(location = 0) in vec3 position;
 
-// out
-
 vec2 positions[6] = vec2[](
     vec2(-1, -1),
     vec2(-1, 1),
