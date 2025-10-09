@@ -22,7 +22,7 @@
 // #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
-constexpr int NUM_SAMPLE_SIZES = 2;
+constexpr int NUM_SAMPLE_SIZES = 1;
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -61,9 +61,9 @@ class VulkanExample : public VulkanExampleBase {
   };
 
   struct DownsampleUBO {
-    glm::vec2 srcResolution;
-    int currentSampleLevel;
-    int karisAverageEnabled;
+    alignas(8) glm::vec2 srcResolution;
+    alignas(4) int currentSampleLevel;
+    alignas(4) int karisAverageEnabled;
   };
 
   struct BlendUBO {
@@ -462,8 +462,7 @@ class VulkanExample : public VulkanExampleBase {
       // Get descriptor for downsampled images
       downsample_descriptor_infos_[0] = offscreenPass_.original.descriptor;
       for (int j = 1; j < NUM_SAMPLE_SIZES; j++) {
-        downsample_descriptor_infos_[j] =
-            offscreenPass_.samples[j - 1].descriptor;
+        downsample_descriptor_infos_[j] = offscreenPass_.original.descriptor;
       }
       writeDescriptorSets.resize(2);
       writeDescriptorSets[0] = vks::initializers::writeDescriptorSet(
@@ -578,8 +577,6 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/blackhole.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
-    blendAttachmentState.blendEnable = VK_FALSE;
-    // depthStencilState.depthWriteEnable = VK_TRUE;
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
@@ -594,8 +591,6 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/downsample.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
-    blendAttachmentState.blendEnable = VK_FALSE;
-    // depthStencilState.depthWriteEnable = VK_TRUE;
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
@@ -1031,18 +1026,6 @@ class VulkanExample : public VulkanExampleBase {
     // We prefer using staging to copy the texture data to a device local
     // optimal image
     VkBool32 useStaging = true;
-
-    // Only use linear tiling if forced
-    bool forceLinearTiling = false;
-    if (forceLinearTiling) {
-      // Don't use linear if format is not supported for (linear) shader
-      // sampling Get device properties for the requested texture format
-      VkFormatProperties formatProperties;
-      vkGetPhysicalDeviceFormatProperties(physicalDevice_, format,
-                                          &formatProperties);
-      useStaging = !(formatProperties.linearTilingFeatures &
-                     VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
-    }
 
     VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
     VkMemoryRequirements memReqs = {};
