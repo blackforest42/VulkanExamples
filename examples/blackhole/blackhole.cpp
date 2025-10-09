@@ -80,12 +80,14 @@ class VulkanExample : public VulkanExampleBase {
   struct {
     BlackholeUBO blackhole;
     DownsampleUBO downsample;
+    UpsampleUBO upsample;
     BlendUBO blend;
   } ubos_;
 
   struct UniformBuffers {
     vks::Buffer blackhole;
     vks::Buffer downsample;
+    vks::Buffer upsample;
     vks::Buffer blend;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
@@ -93,24 +95,28 @@ class VulkanExample : public VulkanExampleBase {
   struct {
     VkPipelineLayout blackhole;
     VkPipelineLayout downsample;
+    VkPipelineLayout upsample;
     VkPipelineLayout blend;
   } pipelineLayouts_{};
 
   struct {
     VkPipeline blackhole;
     VkPipeline downsample;
+    VkPipeline upsample;
     VkPipeline blend;
   } pipelines_{};
 
   struct {
     VkDescriptorSetLayout blackhole;
     VkDescriptorSetLayout downsample;
+    VkDescriptorSetLayout upsample;
     VkDescriptorSetLayout blend;
   } descriptorSetLayouts_{};
 
   struct DescriptorSets {
     VkDescriptorSet blackhole;
     std::array<VkDescriptorSet, NUM_SAMPLE_SIZES> downsamples{};
+    std::array<VkDescriptorSet, NUM_SAMPLE_SIZES> upsamples{};
     VkDescriptorSet blend;
   };
   std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
@@ -159,6 +165,14 @@ class VulkanExample : public VulkanExampleBase {
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
           &buffer.downsample, sizeof(DownsampleUBO), &ubos_.downsample));
       VK_CHECK_RESULT(buffer.downsample.map());
+
+      // Upsample
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.upsample, sizeof(UpsampleUBO), &ubos_.upsample));
+      VK_CHECK_RESULT(buffer.upsample.map());
 
       // Blend
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
@@ -395,7 +409,7 @@ class VulkanExample : public VulkanExampleBase {
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 0),
 
-        // Binding 1: array of down sized maps
+        // Binding 1: Source texture to downsample
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, 1)};
@@ -406,6 +420,23 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.downsample));
 
+    // Layout: Upsample
+    setLayoutBindings = {
+        // Binding 0: uniform buffer
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),
+
+        // Binding 1: Source texture to upsample
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, 1)};
+
+    descriptorSetLayoutCI =
+        vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.upsample));
     // Layout: Blend
     setLayoutBindings = {
         // Binding 0 : uniform buffer for tonemappng
@@ -481,23 +512,22 @@ class VulkanExample : public VulkanExampleBase {
       }
 
       // Descriptor for upsample
-      for (int sample_level = 0; sample_level < NUM_SAMPLE_SIZES;
-           sample_level++) {
+      for (int sample_level = NUM_SAMPLE_SIZES - 1; sample_level >= 0;
+           sample_level--) {
         allocInfo = vks::initializers::descriptorSetAllocateInfo(
-            descriptorPool_, &descriptorSetLayouts_.downsample, 1);
+            descriptorPool_, &descriptorSetLayouts_.upsample, 1);
         VK_CHECK_RESULT(vkAllocateDescriptorSets(
-            device_, &allocInfo,
-            &descriptorSets_[i].downsamples[sample_level]));
+            device_, &allocInfo, &descriptorSets_[i].upsamples[sample_level]));
         writeDescriptorSets = {
             vks::initializers::writeDescriptorSet(
-                descriptorSets_[i].downsamples[sample_level],
+                descriptorSets_[i].upsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 /*binding id*/ 0, &uniformBuffers_[i].downsample.descriptor),
             vks::initializers::writeDescriptorSet(
-                descriptorSets_[i].downsamples[sample_level],
+                descriptorSets_[i].upsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
                 sample_level == 0
-                    ? &offscreenPass_.original.descriptor
+                    ? &offscreenPass_.final.descriptor
                     : &offscreenPass_.samples[sample_level - 1].descriptor)};
         vkUpdateDescriptorSets(
             device_, static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -537,6 +567,10 @@ class VulkanExample : public VulkanExampleBase {
         &descriptorSetLayouts_.downsample, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.downsample));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.upsample, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.upsample));
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
         &descriptorSetLayouts_.blend, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
@@ -623,6 +657,20 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.downsample));
+
+    // Upsample pipeline
+    pipelineCI.layout = pipelineLayouts_.upsample;
+    pipelineCI.renderPass = offscreenPass_.renderPass;
+    shaderStages[0] =
+        loadShader(getShadersPath() + "blackhole/upsample.vert.spv",
+                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] =
+        loadShader(getShadersPath() + "blackhole/upsample.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.upsample));
   }
 
   // (B) Called in VulkanExampleBase::renderLoop()
@@ -1437,6 +1485,8 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blackhole,
                                    nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.downsample,
+                                   nullptr);
+      vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.upsample,
                                    nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blend,
                                    nullptr);

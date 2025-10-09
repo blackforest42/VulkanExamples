@@ -8,7 +8,6 @@
 // Remember to use edge clamping for this texture!
 layout (binding = 1) uniform sampler2D srcTexture;
 
-
 layout (binding = 0) uniform UBO {
 uniform float filterRadius;
 } ubo;
