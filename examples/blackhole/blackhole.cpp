@@ -22,7 +22,7 @@
 // #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
-constexpr int NUM_SAMPLE_SIZES = 6;
+constexpr int NUM_SAMPLE_SIZES = 1;
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -477,7 +477,7 @@ class VulkanExample : public VulkanExampleBase {
         // Binding 1: array of down sized maps
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, NUM_SAMPLE_SIZES)};
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1)};
 
     descriptorSetLayoutCI =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
@@ -535,13 +535,16 @@ class VulkanExample : public VulkanExampleBase {
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // Down sampling descriptor
       allocInfo = vks::initializers::descriptorSetAllocateInfo(
           descriptorPool_, &descriptorSetLayouts_.downsample, 1);
       VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
                                                &descriptorSets_[i].downsample));
       // Get descriptor for downsampled images
-      for (int j = 0; j < NUM_SAMPLE_SIZES; j++) {
-        downsample_descriptor_infos_[j] = offscreenPass_.samples[j].descriptor;
+      downsample_descriptor_infos_[0] = offscreenPass_.original.descriptor;
+      for (int j = 1; j < NUM_SAMPLE_SIZES; j++) {
+        downsample_descriptor_infos_[j] =
+            offscreenPass_.samples[j - 1].descriptor;
       }
       writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
@@ -827,6 +830,7 @@ class VulkanExample : public VulkanExampleBase {
                       offscreenPass_.samples[sample_level - 1].height);
         ubos_.downsample.karisAverageEnabled = 0;
       }
+      ubos_.downsample.currentSampleLevel = sample_level;
       memcpy(uniformBuffers_[currentBuffer_].downsample.mapped,
              &ubos_.downsample, sizeof(DownsampleUBO));
 
