@@ -15,7 +15,7 @@ uniform int karisAverageEnabled;
 } ubo;
 
 // Texture maps
-layout (binding = 1) uniform sampler2D srcTextures;
+layout (binding = 1) uniform sampler2D srcTexture;
 
 // in
 layout (location = 0) in vec2 uv;
@@ -56,25 +56,25 @@ void main() {
   // g - h - i
   // === ('e' is the current texel) ===
   vec3 a =
-      texture(srcTextures, vec2(uv.x - 2 * x, uv.y + 2 * y)).rgb;
-  vec3 b = texture(srcTextures, vec2(uv.x, uv.y + 2 * y)).rgb;
+      texture(srcTexture, vec2(uv.x - 2 * x, uv.y + 2 * y)).rgb;
+  vec3 b = texture(srcTexture, vec2(uv.x, uv.y + 2 * y)).rgb;
   vec3 c =
-      texture(srcTextures, vec2(uv.x + 2 * x, uv.y + 2 * y)).rgb;
+      texture(srcTexture, vec2(uv.x + 2 * x, uv.y + 2 * y)).rgb;
 
-  vec3 d = texture(srcTextures, vec2(uv.x - 2 * x, uv.y)).rgb;
-  vec3 e = texture(srcTextures, vec2(uv.x, uv.y)).rgb;
-  vec3 f = texture(srcTextures, vec2(uv.x + 2 * x, uv.y)).rgb;
+  vec3 d = texture(srcTexture, vec2(uv.x - 2 * x, uv.y)).rgb;
+  vec3 e = texture(srcTexture, vec2(uv.x, uv.y)).rgb;
+  vec3 f = texture(srcTexture, vec2(uv.x + 2 * x, uv.y)).rgb;
 
   vec3 g =
-      texture(srcTextures, vec2(uv.x - 2 * x, uv.y - 2 * y)).rgb;
-  vec3 h = texture(srcTextures, vec2(uv.x, uv.y - 2 * y)).rgb;
+      texture(srcTexture, vec2(uv.x - 2 * x, uv.y - 2 * y)).rgb;
+  vec3 h = texture(srcTexture, vec2(uv.x, uv.y - 2 * y)).rgb;
   vec3 i =
-      texture(srcTextures, vec2(uv.x + 2 * x, uv.y - 2 * y)).rgb;
+      texture(srcTexture, vec2(uv.x + 2 * x, uv.y - 2 * y)).rgb;
 
-  vec3 j = texture(srcTextures, vec2(uv.x - x, uv.y + y)).rgb;
-  vec3 k = texture(srcTextures, vec2(uv.x + x, uv.y + y)).rgb;
-  vec3 l = texture(srcTextures, vec2(uv.x - x, uv.y - y)).rgb;
-  vec3 m = texture(srcTextures, vec2(uv.x + x, uv.y - y)).rgb;
+  vec3 j = texture(srcTexture, vec2(uv.x - x, uv.y + y)).rgb;
+  vec3 k = texture(srcTexture, vec2(uv.x + x, uv.y + y)).rgb;
+  vec3 l = texture(srcTexture, vec2(uv.x - x, uv.y - y)).rgb;
+  vec3 m = texture(srcTexture, vec2(uv.x + x, uv.y - y)).rgb;
 
   // Apply weighted distribution:
   // 0.5 + 0.125 + 0.125 + 0.125 + 0.125 = 1

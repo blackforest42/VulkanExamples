@@ -67,6 +67,10 @@ class VulkanExample : public VulkanExampleBase {
     alignas(4) int karisAverageEnabled;
   };
 
+  struct UpsampleUBO {
+    float filterRadius;
+  };
+
   struct BlendUBO {
     // Tonemapping
     alignas(4) int tonemappingEnabled{1};
@@ -127,9 +131,13 @@ class VulkanExample : public VulkanExampleBase {
     VkRenderPass renderPass;
     VkSampler sampler;
     // Holds the first offscreen framebuffer
+    // used by first down sample pass
     FrameBuffer original;
     // Holds all downsampled framebuffers
     std::array<FrameBuffer, NUM_SAMPLE_SIZES> samples;
+    // Holds final bloom framebuffer
+    // used by last up sample pass
+    FrameBuffer final;
   } offscreenPass_{};
 
   // (A.2)
@@ -261,6 +269,11 @@ class VulkanExample : public VulkanExampleBase {
           static_cast<uint32_t>(width_ * pow(0.5, i + 1));
       prepareOffscreenFramebuffer(&offscreenPass_.samples[i], FB_COLOR_FORMAT);
     }
+
+    // Generate framebuffer for last renderpass
+    offscreenPass_.final.height = height_;
+    offscreenPass_.final.width = width_;
+    prepareOffscreenFramebuffer(&offscreenPass_.final, FB_COLOR_FORMAT);
   }
 
   void prepareOffscreenFramebuffer(FrameBuffer* frameBuf,
@@ -444,6 +457,30 @@ class VulkanExample : public VulkanExampleBase {
                              writeDescriptorSets.data(), 0, nullptr);
 
       // Descriptor for downsample
+      for (int sample_level = 0; sample_level < NUM_SAMPLE_SIZES;
+           sample_level++) {
+        allocInfo = vks::initializers::descriptorSetAllocateInfo(
+            descriptorPool_, &descriptorSetLayouts_.downsample, 1);
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(
+            device_, &allocInfo,
+            &descriptorSets_[i].downsamples[sample_level]));
+        writeDescriptorSets = {
+            vks::initializers::writeDescriptorSet(
+                descriptorSets_[i].downsamples[sample_level],
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                /*binding id*/ 0, &uniformBuffers_[i].downsample.descriptor),
+            vks::initializers::writeDescriptorSet(
+                descriptorSets_[i].downsamples[sample_level],
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
+                sample_level == 0
+                    ? &offscreenPass_.original.descriptor
+                    : &offscreenPass_.samples[sample_level - 1].descriptor)};
+        vkUpdateDescriptorSets(
+            device_, static_cast<uint32_t>(writeDescriptorSets.size()),
+            writeDescriptorSets.data(), 0, nullptr);
+      }
+
+      // Descriptor for upsample
       for (int sample_level = 0; sample_level < NUM_SAMPLE_SIZES;
            sample_level++) {
         allocInfo = vks::initializers::descriptorSetAllocateInfo(
