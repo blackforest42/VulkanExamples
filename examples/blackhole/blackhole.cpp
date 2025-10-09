@@ -129,7 +129,12 @@ class VulkanExample : public VulkanExampleBase {
     FrameBuffer original;
     // Holds all downsampled framebuffers
     std::array<FrameBuffer, NUM_SAMPLE_SIZES> samples;
-  } offscreenPass_{};  // Handles the down/up sampling pass
+  } offscreenPass_{};
+
+  // Need to store the image descriptors for each down sampled image in its own
+  // array to pass to descriptor
+  std::array<VkDescriptorImageInfo, NUM_SAMPLE_SIZES>
+      downsample_descriptor_infos_{};
 
   VulkanExample() : VulkanExampleBase() {
     title = "Blackhole";
@@ -522,6 +527,27 @@ class VulkanExample : public VulkanExampleBase {
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      allocInfo = vks::initializers::descriptorSetAllocateInfo(
+          descriptorPool_, &descriptorSetLayouts_.downsample, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].downsample));
+      // Get descriptor for downsampled images
+      for (int j = 0; j < NUM_SAMPLE_SIZES; j++) {
+        downsample_descriptor_infos_[j] = offscreenPass_.samples[j].descriptor;
+      }
+      writeDescriptorSets = {
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].downsample, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].downsample.descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].downsample,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
+              downsample_descriptor_infos_.data(), NUM_SAMPLE_SIZES),
+      };
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
+
       // Descriptor for blend
       allocInfo = vks::initializers::descriptorSetAllocateInfo(
           descriptorPool_, &descriptorSetLayouts_.blend, 1);
@@ -550,6 +576,10 @@ class VulkanExample : public VulkanExampleBase {
             &descriptorSetLayouts_.blackhole, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.blackhole));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.downsample, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.downsample));
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
         &descriptorSetLayouts_.blend, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
@@ -1372,6 +1402,8 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroyPipelineLayout(device_, pipelineLayouts_.blackhole, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.blend, nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blackhole,
+                                   nullptr);
+      vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.downsample,
                                    nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.blend,
                                    nullptr);

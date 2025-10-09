@@ -1,8 +1,6 @@
 Oct 6
 	- Finish downsampling pipeline:
-		- Create pipeline and layout
 		- Create descriptor set and layout
-		- Create uniforms and buffer
-		- Write vert and frag shaders (port from opengl)
+			- consider create an array for downsampled texture descriptor
 
 	- Start upsampling pipeline
