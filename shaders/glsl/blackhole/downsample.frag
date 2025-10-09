@@ -17,6 +17,9 @@ uniform int karisAverageEnabled;
 // Texture maps
 layout (binding = 1) uniform sampler2D srcTextures[6];
 
+// in
+layout (location = 0) in vec2 uv;
+
 // out
 layout(location = 0) out vec3 downsample;
 
@@ -41,12 +44,6 @@ float KarisAverage(vec3 col) {
 }
 
 void main() {
-    // gl_FragCoord is in window/pixel coordinates where (0,0) is bottom-left
-    // uv is in NDC, where (0,0) is the center
-    vec2 uv = gl_FragCoord.xy / ubo.srcResolution.xy - vec2(0.5);
-    // Aspect ratio correction for non-square screens
-	uv.x *= ubo.srcResolution.x / ubo.srcResolution.y;
-
   vec2 srcTexelSize = 1.0 / ubo.srcResolution;
   float x = srcTexelSize.x;
   float y = srcTexelSize.y;

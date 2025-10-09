@@ -1,6 +1,3 @@
-Oct 6
-	- Finish downsampling pipeline:
-		- Create descriptor set and layout
-			- consider create an array for downsampled texture descriptor
-
-	- Start upsampling pipeline
+Oct 8
+	Down sampling bugged:
+		1. When setting downsample count > 1, the 0th input texture is not getting passed to frag shader

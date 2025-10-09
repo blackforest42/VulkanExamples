@@ -2,6 +2,8 @@
 
 glslc blackhole.vert -o blackhole.vert.spv
 glslc blackhole.frag -o blackhole.frag.spv
+glslc downsample.vert -o downsample.vert.spv
+glslc downsample.frag -o downsample.frag.spv
 glslc blend.vert -o blend.vert.spv
 glslc blend.frag -o blend.frag.spv
 
