@@ -73,12 +73,12 @@ class VulkanExample : public VulkanExampleBase {
 
   struct BlendUBO {
     // Tonemapping
-    alignas(4) int tonemappingEnabled{1};
-    alignas(4) float exposure{2.5f};
+    alignas(4) int tonemappingEnabled;
+    alignas(4) float exposure{2.0f};
 
     // Bloom
     // Linear interpolation b/w source tex and bloom tex
-    alignas(4) float bloomStrength{0.004f};
+    alignas(4) float bloomStrength{0.01f};
   };
 
   struct {

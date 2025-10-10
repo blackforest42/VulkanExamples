@@ -1,5 +1,5 @@
-Oct 8
-	- upsampling
-		- create up sample pipeline
-		- don't forget to add blending
-		- port shaders
+Oct 9
+	- up sampling done!
+	- Flickering squares bug!!
+		- happens when increasing bloom strength
+		- fewer NUM_SAMPLE_SIZES causes smaller squares, means it's proportional to sample resolution
