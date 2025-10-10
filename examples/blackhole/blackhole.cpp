@@ -23,7 +23,7 @@
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
 // Higher than 6 will cause a greyed out screen
-constexpr int NUM_SAMPLE_SIZES = 1;
+constexpr int NUM_SAMPLE_SIZES = 6;
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -447,10 +447,15 @@ class VulkanExample : public VulkanExampleBase {
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 0),
 
-        // Binding 1 : Texture map
+        // Binding 1 : Src texture map
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, 1)};
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1),
+
+        // Binding 2 : Bloom texture map
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 2)};
     descriptorSetLayoutCI =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI,
@@ -719,7 +724,6 @@ class VulkanExample : public VulkanExampleBase {
            sizeof(UpsampleUBO));
 
     ubos_.blend.tonemappingEnabled = toneMappingEnabled;
-    ubos_.blend.bloomStrength = 0.004;
     memcpy(uniformBuffers_[currentBuffer_].blend.mapped, &ubos_.blend,
            sizeof(BlendUBO));
   }
@@ -735,7 +739,7 @@ class VulkanExample : public VulkanExampleBase {
     // Blackhole
     {
       VkClearValue clearValues{};
-      clearValues.color = {0.0f, 1.0f, 1.0f, 1.f};
+      clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
 
       VkRenderPassBeginInfo renderPassBeginInfo =
           vks::initializers::renderPassBeginInfo();
@@ -781,7 +785,7 @@ class VulkanExample : public VulkanExampleBase {
     // Blend
     {
       VkClearValue clearValues{};
-      clearValues.color = {0.f, 1.0f, 0.0f, 1.f};
+      clearValues.color = {0.f, 0.0f, 0.0f, 1.f};
 
       VkRenderPassBeginInfo renderPassBeginInfo =
           vks::initializers::renderPassBeginInfo();
@@ -818,7 +822,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void downSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.f, 0.0f, 1.0f, 1.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 1.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -946,6 +950,8 @@ class VulkanExample : public VulkanExampleBase {
       overlay->sliderFloat("Exposure", &ubos_.blend.exposure, 0.1f, 10.0f);
       overlay->sliderFloat("Bloom Radius", &ubos_.upsample.filterRadius, 0.0f,
                            0.1f);
+      overlay->sliderFloat("Bloom Strength", &ubos_.blend.bloomStrength, 0.0f,
+                           0.5f);
     }
   }
 
@@ -1496,6 +1502,7 @@ class VulkanExample : public VulkanExampleBase {
   void destroyOffscreenPass() {
     vkDestroyRenderPass(device_, offscreenPass_.renderPass, nullptr);
     vkDestroyFramebuffer(device_, offscreenPass_.original.framebuffer, nullptr);
+    vkDestroyFramebuffer(device_, offscreenPass_.final.framebuffer, nullptr);
     for (FrameBuffer sample : offscreenPass_.samples) {
       vkDestroyFramebuffer(device_, sample.framebuffer, nullptr);
     }
@@ -1562,6 +1569,10 @@ class VulkanExample : public VulkanExampleBase {
       vkFreeMemory(device_, offscreenPass_.original.color.mem, nullptr);
       vkDestroyFramebuffer(device_, offscreenPass_.original.framebuffer,
                            nullptr);
+      vkDestroyImageView(device_, offscreenPass_.final.color.view, nullptr);
+      vkDestroyImage(device_, offscreenPass_.final.color.image, nullptr);
+      vkFreeMemory(device_, offscreenPass_.final.color.mem, nullptr);
+      vkDestroyFramebuffer(device_, offscreenPass_.final.framebuffer, nullptr);
       for (auto& sample : offscreenPass_.samples) {
         vkDestroyImageView(device_, sample.color.view, nullptr);
         vkDestroyImage(device_, sample.color.image, nullptr);
