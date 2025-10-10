@@ -75,6 +75,9 @@ class VulkanExample : public VulkanExampleBase {
     // Tonemapping
     alignas(4) int tonemappingEnabled{1};
     alignas(4) float exposure{1.0f};
+
+    // Bloom
+    alignas(4) float bloomStrength{0.004f};
   };
 
   struct {
@@ -474,13 +477,14 @@ class VulkanExample : public VulkanExampleBase {
       std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blackhole, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-              0, &uniformBuffers_[i].blackhole.descriptor),
+              /*binding id*/ 0, &uniformBuffers_[i].blackhole.descriptor),
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blackhole,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor),
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
+              &textureDescriptor),
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blackhole,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 2,
               &blackholeColorTextureDescriptor),
       };
       vkUpdateDescriptorSets(device_,
@@ -544,8 +548,12 @@ class VulkanExample : public VulkanExampleBase {
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              /*binding id*/ 1, &offscreenPass_.original.descriptor)
-          &offscreenPass_.samples[0].descriptor),
+              /*binding id*/ 1, &offscreenPass_.original.descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].blend,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              /*binding id*/ 2, &offscreenPass_.final.descriptor)
+          // offscreenPass_.samples[0].descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -711,6 +719,7 @@ class VulkanExample : public VulkanExampleBase {
            sizeof(UpsampleUBO));
 
     ubos_.blend.tonemappingEnabled = toneMappingEnabled;
+    ubos_.blend.bloomStrength = 0.004;
     memcpy(uniformBuffers_[currentBuffer_].blend.mapped, &ubos_.blend,
            sizeof(BlendUBO));
   }
@@ -726,7 +735,7 @@ class VulkanExample : public VulkanExampleBase {
     // Blackhole
     {
       VkClearValue clearValues{};
-      clearValues.color = {0.0f, 1.0f, 1.0f};
+      clearValues.color = {0.0f, 1.0f, 1.0f, 1.f};
 
       VkRenderPassBeginInfo renderPassBeginInfo =
           vks::initializers::renderPassBeginInfo();
@@ -772,7 +781,7 @@ class VulkanExample : public VulkanExampleBase {
     // Blend
     {
       VkClearValue clearValues{};
-      clearValues.color = {0.f, 1.0f, 0.0f};
+      clearValues.color = {0.f, 1.0f, 0.0f, 1.f};
 
       VkRenderPassBeginInfo renderPassBeginInfo =
           vks::initializers::renderPassBeginInfo();
@@ -809,7 +818,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void downSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.f, 0.0f, 1.0f};
+    clearValues.color = {0.f, 0.0f, 1.0f, 1.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -870,7 +879,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void upSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.f, 0.0f, 0.0f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 1.0f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();

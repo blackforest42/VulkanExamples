@@ -9,7 +9,7 @@
 layout (binding = 1) uniform sampler2D srcTexture;
 
 layout (binding = 0) uniform UBO {
-uniform float filterRadius;
+	float filterRadius;
 } ubo;
 
 // in
