@@ -823,7 +823,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void downSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.f, 1.0f, 0.0f, 1.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 1.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -884,7 +884,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void upSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {1.f, 0.0f, 0.0f, 1.0f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 1.0f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
