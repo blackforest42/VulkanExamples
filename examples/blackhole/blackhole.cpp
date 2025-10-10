@@ -23,7 +23,7 @@
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
 // Higher than 6 will cause a greyed out screen
-constexpr int NUM_SAMPLE_SIZES = 6;
+constexpr int NUM_SAMPLE_SIZES = 1;
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -68,7 +68,7 @@ class VulkanExample : public VulkanExampleBase {
   };
 
   struct UpsampleUBO {
-    float filterRadius;
+    float filterRadius{0.005f};
   };
 
   struct BlendUBO {
@@ -526,9 +526,7 @@ class VulkanExample : public VulkanExampleBase {
             vks::initializers::writeDescriptorSet(
                 descriptorSets_[i].upsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
-                sample_level == 0
-                    ? &offscreenPass_.final.descriptor
-                    : &offscreenPass_.samples[sample_level - 1].descriptor)};
+                &offscreenPass_.samples[sample_level].descriptor)};
         vkUpdateDescriptorSets(
             device_, static_cast<uint32_t>(writeDescriptorSets.size()),
             writeDescriptorSets.data(), 0, nullptr);
@@ -547,7 +545,7 @@ class VulkanExample : public VulkanExampleBase {
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 1, &offscreenPass_.original.descriptor)
-          //&offscreenPass_.samples[0].descriptor),
+          &offscreenPass_.samples[0].descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -661,6 +659,15 @@ class VulkanExample : public VulkanExampleBase {
     // Upsample pipeline
     pipelineCI.layout = pipelineLayouts_.upsample;
     pipelineCI.renderPass = offscreenPass_.renderPass;
+    // Additive blending
+    blendAttachmentState.colorWriteMask = 0xF;
+    blendAttachmentState.blendEnable = VK_TRUE;
+    blendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+    blendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    blendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+    blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
     shaderStages[0] =
         loadShader(getShadersPath() + "blackhole/upsample.vert.spv",
                    VK_SHADER_STAGE_VERTEX_BIT);
@@ -699,6 +706,9 @@ class VulkanExample : public VulkanExampleBase {
     ubos_.blackhole.accDiskParticleEnabled = accDiskParticleEnabled;
     memcpy(uniformBuffers_[currentBuffer_].blackhole.mapped, &ubos_.blackhole,
            sizeof(BlackholeUBO));
+
+    memcpy(uniformBuffers_[currentBuffer_].upsample.mapped, &ubos_.upsample,
+           sizeof(UpsampleUBO));
 
     ubos_.blend.tonemappingEnabled = toneMappingEnabled;
     memcpy(uniformBuffers_[currentBuffer_].blend.mapped, &ubos_.blend,
@@ -755,6 +765,9 @@ class VulkanExample : public VulkanExampleBase {
 
     // Down sampling
     downSamplingCmdBuffer(cmdBuffer);
+
+    // Up sampling
+    upSamplingCmdBuffer(cmdBuffer);
 
     // Blend
     {
@@ -855,6 +868,50 @@ class VulkanExample : public VulkanExampleBase {
     }
   }
 
+  void upSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
+    VkClearValue clearValues{};
+    clearValues.color = {0.f, 0.0f, 0.0f};
+
+    VkRenderPassBeginInfo renderPassBeginInfo =
+        vks::initializers::renderPassBeginInfo();
+    renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+
+    for (int sample_level = NUM_SAMPLE_SIZES - 1; sample_level >= 0;
+         sample_level--) {
+      // Set render fb target
+      const VulkanExample::FrameBuffer& fb =
+          sample_level == 0 ? offscreenPass_.final
+                            : offscreenPass_.samples[sample_level - 1];
+      renderPassBeginInfo.framebuffer = fb.framebuffer;
+      renderPassBeginInfo.renderArea.extent.width = fb.width;
+      renderPassBeginInfo.renderArea.extent.height = fb.height;
+      renderPassBeginInfo.clearValueCount = 1;
+      renderPassBeginInfo.pClearValues = &clearValues;
+
+      // Render
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+
+      VkViewport viewport = vks::initializers::viewport(
+          (float)fb.width, (float)fb.height, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+      VkRect2D scissor = vks::initializers::rect2D(fb.width, fb.height, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.upsample,
+          0, 1, &descriptorSets_[currentBuffer_].upsamples[sample_level], 0,
+          nullptr);
+
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines_.upsample);
+      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+      vkCmdEndRenderPass(cmdBuffer);
+    }
+  }
+
   virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay) {
     if (overlay->header("Settings")) {
       overlay->checkBox("Show Blackhole", &showBlackholeUI);
@@ -876,9 +933,10 @@ class VulkanExample : public VulkanExampleBase {
                          0, 10);
       overlay->sliderFloat("Accretion Disk Speed",
                            &ubos_.blackhole.accDiskSpeed, 0.0, 2.0);
-
       overlay->checkBox("Tone Mapping Enabled", &toneMappingEnabled);
       overlay->sliderFloat("Exposure", &ubos_.blend.exposure, 0.1f, 10.0f);
+      overlay->sliderFloat("Bloom Radius", &ubos_.upsample.filterRadius, 0.0f,
+                           0.1f);
     }
   }
 
