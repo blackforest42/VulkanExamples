@@ -9,9 +9,9 @@
 // Remember to use a floating-point texture format (for HDR)!
 // Remember to use edge clamping for this texture!
 layout (binding = 0) uniform UBO {
-uniform vec2 srcResolution;
-uniform int currentSampleLevel;
-uniform int karisAverageEnabled;
+	vec2 srcResolution;
+	int currentSampleLevel;
+	int karisAverageEnabled;
 } ubo;
 
 // Texture maps

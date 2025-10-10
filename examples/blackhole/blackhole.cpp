@@ -74,9 +74,10 @@ class VulkanExample : public VulkanExampleBase {
   struct BlendUBO {
     // Tonemapping
     alignas(4) int tonemappingEnabled{1};
-    alignas(4) float exposure{1.0f};
+    alignas(4) float exposure{2.5f};
 
     // Bloom
+    // Linear interpolation b/w source tex and bloom tex
     alignas(4) float bloomStrength{0.004f};
   };
 
@@ -679,8 +680,8 @@ class VulkanExample : public VulkanExampleBase {
     blendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
     blendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
     blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
-    blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+    blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     shaderStages[0] =
         loadShader(getShadersPath() + "blackhole/upsample.vert.spv",
                    VK_SHADER_STAGE_VERTEX_BIT);
@@ -948,10 +949,10 @@ class VulkanExample : public VulkanExampleBase {
                            &ubos_.blackhole.accDiskSpeed, 0.0, 2.0);
       overlay->checkBox("Tone Mapping Enabled", &toneMappingEnabled);
       overlay->sliderFloat("Exposure", &ubos_.blend.exposure, 0.1f, 10.0f);
-      overlay->sliderFloat("Bloom Radius", &ubos_.upsample.filterRadius, 0.0f,
-                           1.0f);
+      overlay->sliderFloat("Bloom Radius", &ubos_.upsample.filterRadius, 0.005f,
+                           .01f);
       overlay->sliderFloat("Bloom Strength", &ubos_.blend.bloomStrength, 0.0f,
-                           0.5f);
+                           1.0f);
     }
   }
 
