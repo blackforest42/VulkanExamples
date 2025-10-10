@@ -29,7 +29,7 @@ layout (binding = 0) uniform UBO
 
 // Texture maps
 layout (binding = 1) uniform samplerCube galaxyCubemap;
-layout (binding = 2) uniform sampler2D colorMap;
+layout (binding = 2) uniform sampler2D accretionDiskTextureMap;
 
 const float PI = 3.14159265359;
 const float EPSILON = 0.0001;
@@ -147,7 +147,7 @@ void accDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
   }
 
   vec3 dustColor =
-      texture(colorMap, vec2(sphericalCoord.x / outerRadius, 0.5)).rgb;
+      texture(accretionDiskTextureMap, vec2(sphericalCoord.x / outerRadius, 0.5)).rgb;
 
   color += density * ubo.accDiskLit * dustColor * alpha * abs(noise);
 }

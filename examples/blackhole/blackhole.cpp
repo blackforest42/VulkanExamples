@@ -23,12 +23,12 @@
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
 // Higher than 6 will cause a greyed out screen
-constexpr int NUM_SAMPLE_SIZES = 6;
+constexpr int NUM_SAMPLE_SIZES = 3;
 
 class VulkanExample : public VulkanExampleBase {
  public:
   vks::Texture cubeMap_{};
-  vks::Texture accretionDiskColorMap_{};
+  vks::Texture accretionDiskTextureMap_{};
 
   // Hacky workaround.
   // Boolean uniforms don't work in shaders for some reason.
@@ -467,10 +467,10 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::descriptorImageInfo(cubeMap_.sampler, cubeMap_.view,
                                                cubeMap_.imageLayout);
     // Image descriptor for the blackhole color texture
-    VkDescriptorImageInfo blackholeColorTextureDescriptor =
+    VkDescriptorImageInfo accretionDiskTextureMap =
         vks::initializers::descriptorImageInfo(
-            accretionDiskColorMap_.sampler, accretionDiskColorMap_.view,
-            accretionDiskColorMap_.imageLayout);
+            accretionDiskTextureMap_.sampler, accretionDiskTextureMap_.view,
+            accretionDiskTextureMap_.imageLayout);
 
     for (auto i = 0; i < uniformBuffers_.size(); i++) {
       // Descriptor for blackhole
@@ -490,7 +490,7 @@ class VulkanExample : public VulkanExampleBase {
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blackhole,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 2,
-              &blackholeColorTextureDescriptor),
+              &accretionDiskTextureMap),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -1167,9 +1167,9 @@ class VulkanExample : public VulkanExampleBase {
 
     // Get properties required for using and upload texture data from the ktx
     // texture object
-    accretionDiskColorMap_.width = ktxTexture->baseWidth;
-    accretionDiskColorMap_.height = ktxTexture->baseHeight;
-    accretionDiskColorMap_.mipLevels = ktxTexture->numLevels;
+    accretionDiskTextureMap_.width = ktxTexture->baseWidth;
+    accretionDiskTextureMap_.height = ktxTexture->baseHeight;
+    accretionDiskTextureMap_.mipLevels = ktxTexture->numLevels;
     ktx_uint8_t* ktxTextureData = ktxTexture_GetData(ktxTexture);
     ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
 
@@ -1224,7 +1224,7 @@ class VulkanExample : public VulkanExampleBase {
       std::vector<VkBufferImageCopy> bufferCopyRegions;
       uint32_t offset = 0;
 
-      for (uint32_t i = 0; i < accretionDiskColorMap_.mipLevels; i++) {
+      for (uint32_t i = 0; i < accretionDiskTextureMap_.mipLevels; i++) {
         // Calculate offset into staging buffer for the current mip level
         ktx_size_t offset;
         KTX_error_code ret =
@@ -1248,29 +1248,29 @@ class VulkanExample : public VulkanExampleBase {
       VkImageCreateInfo imageCreateInfo = vks::initializers::imageCreateInfo();
       imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
       imageCreateInfo.format = format;
-      imageCreateInfo.mipLevels = accretionDiskColorMap_.mipLevels;
+      imageCreateInfo.mipLevels = accretionDiskTextureMap_.mipLevels;
       imageCreateInfo.arrayLayers = 1;
       imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
       imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
       imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
       // Set initial layout of the image to undefined
       imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      imageCreateInfo.extent = {accretionDiskColorMap_.width,
-                                accretionDiskColorMap_.height, 1};
+      imageCreateInfo.extent = {accretionDiskTextureMap_.width,
+                                accretionDiskTextureMap_.height, 1};
       imageCreateInfo.usage =
           VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
       VK_CHECK_RESULT(vkCreateImage(device_, &imageCreateInfo, nullptr,
-                                    &accretionDiskColorMap_.image));
+                                    &accretionDiskTextureMap_.image));
 
-      vkGetImageMemoryRequirements(device_, accretionDiskColorMap_.image,
+      vkGetImageMemoryRequirements(device_, accretionDiskTextureMap_.image,
                                    &memReqs);
       memAllocInfo.allocationSize = memReqs.size;
       memAllocInfo.memoryTypeIndex = vulkanDevice_->getMemoryType(
           memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
       VK_CHECK_RESULT(vkAllocateMemory(device_, &memAllocInfo, nullptr,
-                                       &accretionDiskColorMap_.deviceMemory));
-      VK_CHECK_RESULT(vkBindImageMemory(device_, accretionDiskColorMap_.image,
-                                        accretionDiskColorMap_.deviceMemory,
+                                       &accretionDiskTextureMap_.deviceMemory));
+      VK_CHECK_RESULT(vkBindImageMemory(device_, accretionDiskTextureMap_.image,
+                                        accretionDiskTextureMap_.deviceMemory,
                                         0));
 
       VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(
@@ -1286,7 +1286,7 @@ class VulkanExample : public VulkanExampleBase {
       // Start at first mip level
       subresourceRange.baseMipLevel = 0;
       // We will transition on all mip levels
-      subresourceRange.levelCount = accretionDiskColorMap_.mipLevels;
+      subresourceRange.levelCount = accretionDiskTextureMap_.mipLevels;
       // The 2D texture only has one layer
       subresourceRange.layerCount = 1;
 
@@ -1295,7 +1295,7 @@ class VulkanExample : public VulkanExampleBase {
       VkImageMemoryBarrier imageMemoryBarrier =
           vks::initializers::imageMemoryBarrier();
       ;
-      imageMemoryBarrier.image = accretionDiskColorMap_.image;
+      imageMemoryBarrier.image = accretionDiskTextureMap_.image;
       imageMemoryBarrier.subresourceRange = subresourceRange;
       imageMemoryBarrier.srcAccessMask = 0;
       imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1313,7 +1313,7 @@ class VulkanExample : public VulkanExampleBase {
 
       // Copy mip levels from staging buffer
       vkCmdCopyBufferToImage(copyCmd, stagingBuffer,
-                             accretionDiskColorMap_.image,
+                             accretionDiskTextureMap_.image,
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                              static_cast<uint32_t>(bufferCopyRegions.size()),
                              bufferCopyRegions.data());
@@ -1335,7 +1335,7 @@ class VulkanExample : public VulkanExampleBase {
                            0, nullptr, 1, &imageMemoryBarrier);
 
       // Store current layout for later reuse
-      accretionDiskColorMap_.imageLayout =
+      accretionDiskTextureMap_.imageLayout =
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
       vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
@@ -1360,8 +1360,8 @@ class VulkanExample : public VulkanExampleBase {
       imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
       imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
       imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-      imageCreateInfo.extent = {accretionDiskColorMap_.width,
-                                accretionDiskColorMap_.height, 1};
+      imageCreateInfo.extent = {accretionDiskTextureMap_.width,
+                                accretionDiskTextureMap_.height, 1};
       VK_CHECK_RESULT(
           vkCreateImage(device_, &imageCreateInfo, nullptr, &mappableImage));
 
@@ -1388,9 +1388,9 @@ class VulkanExample : public VulkanExampleBase {
 
       // Linear tiled images don't need to be staged and can be directly used
       // as textures
-      accretionDiskColorMap_.image = mappableImage;
-      accretionDiskColorMap_.deviceMemory = mappableMemory;
-      accretionDiskColorMap_.imageLayout =
+      accretionDiskTextureMap_.image = mappableImage;
+      accretionDiskTextureMap_.deviceMemory = mappableMemory;
+      accretionDiskTextureMap_.imageLayout =
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
       // Setup image memory barrier transfer image to shader read layout
@@ -1410,7 +1410,7 @@ class VulkanExample : public VulkanExampleBase {
       VkImageMemoryBarrier imageMemoryBarrier =
           vks::initializers::imageMemoryBarrier();
       ;
-      imageMemoryBarrier.image = accretionDiskColorMap_.image;
+      imageMemoryBarrier.image = accretionDiskTextureMap_.image;
       imageMemoryBarrier.subresourceRange = subresourceRange;
       imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
       imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -1449,7 +1449,7 @@ class VulkanExample : public VulkanExampleBase {
     sampler.minLod = 0.0f;
     // Set max level-of-detail to mip level count of the texture
     sampler.maxLod =
-        (useStaging) ? (float)accretionDiskColorMap_.mipLevels : 0.0f;
+        (useStaging) ? (float)accretionDiskTextureMap_.mipLevels : 0.0f;
     // Enable anisotropic filtering
     // This feature is optional, so we must check if it's supported on the
     // device
@@ -1465,7 +1465,7 @@ class VulkanExample : public VulkanExampleBase {
     }
     sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
     VK_CHECK_RESULT(vkCreateSampler(device_, &sampler, nullptr,
-                                    &accretionDiskColorMap_.sampler));
+                                    &accretionDiskTextureMap_.sampler));
 
     // Create image view
     // Textures are not directly accessed by the shaders and
@@ -1485,11 +1485,11 @@ class VulkanExample : public VulkanExampleBase {
     // Linear tiling usually won't support mip maps
     // Only set mip map count if optimal tiling is used
     view.subresourceRange.levelCount =
-        (useStaging) ? accretionDiskColorMap_.mipLevels : 1;
+        (useStaging) ? accretionDiskTextureMap_.mipLevels : 1;
     // The view will be based on the texture's image
-    view.image = accretionDiskColorMap_.image;
+    view.image = accretionDiskTextureMap_.image;
     VK_CHECK_RESULT(vkCreateImageView(device_, &view, nullptr,
-                                      &accretionDiskColorMap_.view));
+                                      &accretionDiskTextureMap_.view));
   }
 
   // Enable physical device features required for this example

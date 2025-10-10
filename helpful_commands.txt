@@ -4,14 +4,10 @@ glslc blackhole.vert -o blackhole.vert.spv
 glslc blackhole.frag -o blackhole.frag.spv
 glslc downsample.vert -o downsample.vert.spv
 glslc downsample.frag -o downsample.frag.spv
+glslc upsample.vert -o upsample.vert.spv
+glslc upsample.frag -o upsample.frag.spv
 glslc blend.vert -o blend.vert.spv
 glslc blend.frag -o blend.frag.spv
-
-
-
-##################
-glslc texture.vert -o texture.vert.spv
-glslc texture.frag -o texture.frag.spv
 
 
 
