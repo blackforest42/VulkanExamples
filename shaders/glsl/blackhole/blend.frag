@@ -10,8 +10,8 @@ layout (binding = 0) uniform UBO
 	float bloomStrength;
 } ubo;
 
-layout (binding = 1) uniform sampler2D srcTexture;
-layout (binding = 2) uniform sampler2D bloomTexture;
+layout (binding = 1) uniform sampler2D blackholeTex;
+layout (binding = 2) uniform sampler2D upSampledTex;
 
 // in 
 layout (location = 0) in vec2 inUV;
@@ -23,14 +23,13 @@ void main() {
 	//outFragColor = vec4(0, 0, 1.f, 1.0);
 	//return;
 
-	vec3 srcColor = texture(srcTexture, inUV).rgb;
-	vec3 bloomColor = texture(bloomTexture, inUV).rgb;
-
-	outFragColor.rgb = bloomColor;
-	return;
+	vec3 blackholeColor = texture(blackholeTex, inUV).rgb;
+	vec3 upSampledColor = texture(upSampledTex, inUV).rgb;
 
 	// linear interpolation
-	vec3 result = mix(srcColor, bloomColor, ubo.bloomStrength);
+	vec3 result = mix(blackholeColor, upSampledColor, ubo.bloomStrength);
+	// Orignal mixing procedure
+	//vec3 result = blackholeColor + upSampledColor * ubo.bloomStrength;
 
 	if (ubo.tonemapEnabled == 1) {
 		// Tonemapping

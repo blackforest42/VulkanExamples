@@ -22,7 +22,6 @@
 // #define FB_COLOR_FORMAT VK_FORMAT_R8G8B8A8_UNORM
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
-// Higher than 6 will cause a greyed out screen
 constexpr int NUM_SAMPLE_SIZES = 6;
 
 class VulkanExample : public VulkanExampleBase {
@@ -76,11 +75,11 @@ class VulkanExample : public VulkanExampleBase {
   struct BlendUBO {
     // Tonemapping
     alignas(4) int tonemappingEnabled;
-    alignas(4) float exposure{2.0f};
+    alignas(4) float exposure{1.0f};
 
     // Bloom
     // Linear interpolation b/w source tex and bloom tex
-    alignas(4) float bloomStrength{0.01f};
+    alignas(4) float bloomStrength{0.1f};
   };
 
   struct {
