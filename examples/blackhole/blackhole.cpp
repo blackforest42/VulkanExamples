@@ -61,6 +61,10 @@ class VulkanExample : public VulkanExampleBase {
     float accDiskSpeed{0.5f};
   };
 
+  struct BrightnessUBO {
+    glm::vec2 viewportResolution;
+  };
+
   struct DownsampleUBO {
     alignas(8) glm::vec2 srcResolution;
     alignas(4) int currentSampleLevel;
@@ -83,6 +87,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     BlackholeUBO blackhole;
+    BrightnessUBO brightness;
     DownsampleUBO downsample;
     UpsampleUBO upsample;
     BlendUBO blend;
@@ -90,6 +95,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct UniformBuffers {
     vks::Buffer blackhole;
+    vks::Buffer brightness;
     vks::Buffer downsample;
     vks::Buffer upsample;
     vks::Buffer blend;
@@ -122,6 +128,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct DescriptorSets {
     VkDescriptorSet blackhole;
+    VkDescriptorSet brightness;
     std::array<VkDescriptorSet, NUM_SAMPLE_SIZES> downsamples{};
     std::array<VkDescriptorSet, NUM_SAMPLE_SIZES> upsamples{};
     VkDescriptorSet blend;
@@ -165,6 +172,14 @@ class VulkanExample : public VulkanExampleBase {
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
           &buffer.blackhole, sizeof(BlackholeUBO), &ubos_.blackhole));
       VK_CHECK_RESULT(buffer.blackhole.map());
+
+      // Brightness
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.brightness, sizeof(BrightnessUBO), &ubos_.brightness));
+      VK_CHECK_RESULT(buffer.brightness.map());
 
       // Downsample
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
@@ -283,6 +298,11 @@ class VulkanExample : public VulkanExampleBase {
     offscreenPass_.original.width = width_;
     prepareOffscreenFramebuffer(&offscreenPass_.original, FB_COLOR_FORMAT);
 
+    // Generate framebuffer for brightness pass
+    offscreenPass_.brightness.height = height_;
+    offscreenPass_.brightness.width = width_;
+    prepareOffscreenFramebuffer(&offscreenPass_.brightness, FB_COLOR_FORMAT);
+
     // Generate fb's for each level using mipmap scaling (1/2).
     for (int i = 0; i < NUM_SAMPLE_SIZES; i++) {
       offscreenPass_.samples[i].height =
@@ -372,14 +392,15 @@ class VulkanExample : public VulkanExampleBase {
     std::vector<VkDescriptorPoolSize> poolSizes = {
         vks::initializers::descriptorPoolSize(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 8 * NUM_SAMPLE_SIZES),
+            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 10 *
+                NUM_SAMPLE_SIZES),
         vks::initializers::descriptorPoolSize(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 6 *
+            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 8 *
                 NUM_SAMPLE_SIZES)};
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(
-            poolSizes, MAX_CONCURRENT_FRAMES * 4 * NUM_SAMPLE_SIZES);
+            poolSizes, MAX_CONCURRENT_FRAMES * 6 * NUM_SAMPLE_SIZES);
     VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
                                            nullptr, &descriptorPool_));
 
@@ -409,6 +430,27 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.blackhole));
+
+    // Layout: Brightness
+    setLayoutBindings = {
+        // Binding 0 : Fragment shader brightness uniform buffer
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),
+
+        // Binding 1 : Fragment shader blackhole 2D texture
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 1)};
+
+    descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(
+        setLayoutBindings.data(),
+        static_cast<uint32_t>(setLayoutBindings.size()));
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.brightness));
 
     // Layout: Downsample
     setLayoutBindings = {
@@ -501,6 +543,23 @@ class VulkanExample : public VulkanExampleBase {
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // Descriptor for brightness pass
+      allocInfo = vks::initializers::descriptorSetAllocateInfo(
+          descriptorPool_, &descriptorSetLayouts_.brightness, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].brightness));
+      writeDescriptorSets = {
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].brightness, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].brightness.descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].brightness,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
+              &offscreenPass_.original.descriptor)};
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
+
       // Descriptor for downsample
       for (int sample_level = 0; sample_level < NUM_SAMPLE_SIZES;
            sample_level++) {
@@ -563,7 +622,7 @@ class VulkanExample : public VulkanExampleBase {
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 2,  // &offscreenPass_.final.descriptor)};
-              &offscreenPass_.samples[0].descriptor)};
+              &offscreenPass_.brightness.descriptor)};
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
@@ -578,6 +637,10 @@ class VulkanExample : public VulkanExampleBase {
             &descriptorSetLayouts_.blackhole, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.blackhole));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.brightness, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.brightness));
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
         &descriptorSetLayouts_.downsample, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
@@ -632,24 +695,21 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.pStages = shaderStages.data();
 
     // Blend pipeline
-    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
-                                 VK_SHADER_STAGE_VERTEX_BIT);
-    shaderStages[1] = loadShader(getShadersPath() + "blackhole/blend.frag.spv",
-                                 VK_SHADER_STAGE_FRAGMENT_BIT);
-
     // No vertices to input, quad verts are hardcoded in vertex shader.
     VkPipelineVertexInputStateCreateInfo emptyInputState =
         vks::initializers::pipelineVertexInputStateCreateInfo();
     pipelineCI.pVertexInputState = &emptyInputState;
     pipelineCI.layout = pipelineLayouts_.blend;
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] = loadShader(getShadersPath() + "blackhole/blend.frag.spv",
+                                 VK_SHADER_STAGE_FRAGMENT_BIT);
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.blend));
 
     // Blackhole pipeline
     pipelineCI.layout = pipelineLayouts_.blackhole;
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
-                                 VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/blackhole.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -657,12 +717,20 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
                                               &pipelineCI, nullptr,
                                               &pipelines_.blackhole));
+    // Brightness pipeline
+    pipelineCI.layout = pipelineLayouts_.brightness;
+    pipelineCI.renderPass = offscreenPass_.renderPass;
+    shaderStages[1] =
+        loadShader(getShadersPath() + "blackhole/brightness.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.brightness));
 
     // Downsample pipeline
     pipelineCI.layout = pipelineLayouts_.downsample;
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
-                                 VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/downsample.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -721,6 +789,11 @@ class VulkanExample : public VulkanExampleBase {
     memcpy(uniformBuffers_[currentBuffer_].blackhole.mapped, &ubos_.blackhole,
            sizeof(BlackholeUBO));
 
+    ubos_.brightness.viewportResolution = glm::vec2(
+        offscreenPass_.brightness.width, offscreenPass_.brightness.height);
+    memcpy(uniformBuffers_[currentBuffer_].brightness.mapped, &ubos_.brightness,
+           sizeof(BrightnessUBO));
+
     memcpy(uniformBuffers_[currentBuffer_].upsample.mapped, &ubos_.upsample,
            sizeof(UpsampleUBO));
 
@@ -776,9 +849,46 @@ class VulkanExample : public VulkanExampleBase {
 
       vkCmdEndRenderPass(cmdBuffer);
     }
+    // Brightness
+    {
+      VkClearValue clearValues{};
+      clearValues.color = {0.f, 0.0f, 0.0f, 1.f};
+
+      VkRenderPassBeginInfo renderPassBeginInfo =
+          vks::initializers::renderPassBeginInfo();
+      renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+      const VulkanExample::FrameBuffer& fb = offscreenPass_.brightness;
+      renderPassBeginInfo.framebuffer = fb.framebuffer;
+      renderPassBeginInfo.renderArea.offset.x = 0;
+      renderPassBeginInfo.renderArea.offset.y = 0;
+      renderPassBeginInfo.renderArea.extent.width = fb.width;
+      renderPassBeginInfo.renderArea.extent.height = fb.height;
+      renderPassBeginInfo.clearValueCount = 1;
+      renderPassBeginInfo.pClearValues = &clearValues;
+
+      vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE);
+      VkViewport viewport = vks::initializers::viewport(
+          (float)fb.width, (float)fb.height, 0.0f, 1.0f);
+      vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+      VkRect2D scissor = vks::initializers::rect2D(fb.width, fb.height, 0, 0);
+      vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              pipelineLayouts_.brightness, 0, 1,
+                              &descriptorSets_[currentBuffer_].brightness, 0,
+                              nullptr);
+
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipelines_.brightness);
+      vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+      vkCmdEndRenderPass(cmdBuffer);
+    }
 
     // Down sampling
-    downSamplingCmdBuffer(cmdBuffer);
+    // downSamplingCmdBuffer(cmdBuffer);
 
     // Up sampling
     // upSamplingCmdBuffer(cmdBuffer);
@@ -1503,6 +1613,8 @@ class VulkanExample : public VulkanExampleBase {
   void destroyOffscreenPass() {
     vkDestroyRenderPass(device_, offscreenPass_.renderPass, nullptr);
     vkDestroyFramebuffer(device_, offscreenPass_.original.framebuffer, nullptr);
+    vkDestroyFramebuffer(device_, offscreenPass_.brightness.framebuffer,
+                         nullptr);
     vkDestroyFramebuffer(device_, offscreenPass_.final.framebuffer, nullptr);
     for (FrameBuffer sample : offscreenPass_.samples) {
       vkDestroyFramebuffer(device_, sample.framebuffer, nullptr);
@@ -1569,6 +1681,12 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroyImage(device_, offscreenPass_.original.color.image, nullptr);
       vkFreeMemory(device_, offscreenPass_.original.color.mem, nullptr);
       vkDestroyFramebuffer(device_, offscreenPass_.original.framebuffer,
+                           nullptr);
+      vkDestroyImageView(device_, offscreenPass_.brightness.color.view,
+                         nullptr);
+      vkDestroyImage(device_, offscreenPass_.brightness.color.image, nullptr);
+      vkFreeMemory(device_, offscreenPass_.brightness.color.mem, nullptr);
+      vkDestroyFramebuffer(device_, offscreenPass_.brightness.framebuffer,
                            nullptr);
       vkDestroyImageView(device_, offscreenPass_.final.color.view, nullptr);
       vkDestroyImage(device_, offscreenPass_.final.color.image, nullptr);
