@@ -1,11 +1,10 @@
 #version 450
 
-
 // out
 layout (location = 0) out vec4 outFragColor;
 
 layout (binding = 0) uniform UBO  {
-vec2 viewportResolution;
+	vec2 viewportResolution;
 } ubo;
 
 layout (binding = 1) uniform sampler2D srcTexture;

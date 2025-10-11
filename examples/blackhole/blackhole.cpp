@@ -23,7 +23,7 @@
 #define FB_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
 // Number of down/up samples during bloom
 // Higher than 6 will cause a greyed out screen
-constexpr int NUM_SAMPLE_SIZES = 1;
+constexpr int NUM_SAMPLE_SIZES = 6;
 
 class VulkanExample : public VulkanExampleBase {
  public:
@@ -67,8 +67,6 @@ class VulkanExample : public VulkanExampleBase {
 
   struct DownsampleUBO {
     alignas(8) glm::vec2 srcResolution;
-    alignas(4) int currentSampleLevel;
-    alignas(4) int karisAverageEnabled;
   };
 
   struct UpsampleUBO {
@@ -96,7 +94,7 @@ class VulkanExample : public VulkanExampleBase {
   struct UniformBuffers {
     vks::Buffer blackhole;
     vks::Buffer brightness;
-    vks::Buffer downsample;
+    std::array<vks::Buffer, NUM_SAMPLE_SIZES> downsample;
     vks::Buffer upsample;
     vks::Buffer blend;
   };
@@ -183,12 +181,14 @@ class VulkanExample : public VulkanExampleBase {
       VK_CHECK_RESULT(buffer.brightness.map());
 
       // Downsample
-      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
-          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-          &buffer.downsample, sizeof(DownsampleUBO), &ubos_.downsample));
-      VK_CHECK_RESULT(buffer.downsample.map());
+      for (int i = 0; i < NUM_SAMPLE_SIZES; i++) {
+        VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &buffer.downsample[i], sizeof(DownsampleUBO), &ubos_.downsample));
+        VK_CHECK_RESULT(buffer.downsample[i].map());
+      }
 
       // Upsample
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
@@ -307,9 +307,9 @@ class VulkanExample : public VulkanExampleBase {
     // Generate fb's for each down sample using mipmap scaling (1/2).
     for (int i = 0; i < NUM_SAMPLE_SIZES; i++) {
       offscreenPass_.down_samples[i].height =
-          static_cast<uint32_t>(height_ * pow(0.5, i + 1));
+          static_cast<uint32_t>(height_ >> (i + 1));
       offscreenPass_.down_samples[i].width =
-          static_cast<uint32_t>(width_ * pow(0.5, i + 1));
+          static_cast<uint32_t>(width_ >> (i + 1));
       prepareOffscreenFramebuffer(&offscreenPass_.down_samples[i],
                                   FB_COLOR_FORMAT);
 
@@ -471,7 +471,7 @@ class VulkanExample : public VulkanExampleBase {
         // Binding 1: Source texture to downsample
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, 1)};
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1)};
 
     descriptorSetLayoutCI =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
@@ -581,12 +581,13 @@ class VulkanExample : public VulkanExampleBase {
             vks::initializers::writeDescriptorSet(
                 descriptorSets_[i].downsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /*binding id*/ 0, &uniformBuffers_[i].downsample.descriptor),
+                /*binding id*/ 0,
+                &uniformBuffers_[i].downsample[sample_level].descriptor),
             vks::initializers::writeDescriptorSet(
                 descriptorSets_[i].downsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
                 sample_level == 0
-                    ? &offscreenPass_.original.descriptor
+                    ? &offscreenPass_.brightness.descriptor
                     : &offscreenPass_.down_samples[sample_level - 1]
                            .descriptor)};
         vkUpdateDescriptorSets(
@@ -899,7 +900,7 @@ class VulkanExample : public VulkanExampleBase {
     }
 
     // Down sampling
-    // downSamplingCmdBuffer(cmdBuffer);
+    downSamplingCmdBuffer(cmdBuffer);
 
     // Up sampling
     // upSamplingCmdBuffer(cmdBuffer);
@@ -944,7 +945,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void downSamplingCmdBuffer(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {1.f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 1.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -953,20 +954,10 @@ class VulkanExample : public VulkanExampleBase {
     for (int sample_level = 0; sample_level < NUM_SAMPLE_SIZES;
          sample_level++) {
       // (1) Update and copy uniforms
-      if (sample_level == 0) {
-        // for first downsample, use the source texture
-        ubos_.downsample.srcResolution = glm::vec2(
-            offscreenPass_.original.width, offscreenPass_.original.height);
-        // Karis average enabled only on first pass
-        ubos_.downsample.karisAverageEnabled = 1;
-      } else {
-        ubos_.downsample.srcResolution =
-            glm::vec2(offscreenPass_.down_samples[sample_level - 1].width,
-                      offscreenPass_.down_samples[sample_level - 1].height);
-        ubos_.downsample.karisAverageEnabled = 0;
-      }
-      ubos_.downsample.currentSampleLevel = sample_level;
-      memcpy(uniformBuffers_[currentBuffer_].downsample.mapped,
+      ubos_.downsample.srcResolution =
+          glm::vec2(offscreenPass_.down_samples[sample_level].width,
+                    offscreenPass_.down_samples[sample_level].height);
+      memcpy(uniformBuffers_[currentBuffer_].downsample[sample_level].mapped,
              &ubos_.downsample, sizeof(DownsampleUBO));
 
       // (2) Set render fb target
