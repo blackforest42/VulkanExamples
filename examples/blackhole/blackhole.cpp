@@ -98,6 +98,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     VkPipelineLayout blackhole;
+    VkPipelineLayout brightness;
     VkPipelineLayout downsample;
     VkPipelineLayout upsample;
     VkPipelineLayout blend;
@@ -105,6 +106,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     VkPipeline blackhole;
+    VkPipeline brightness;
     VkPipeline downsample;
     VkPipeline upsample;
     VkPipeline blend;
@@ -112,6 +114,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     VkDescriptorSetLayout blackhole;
+    VkDescriptorSetLayout brightness;
     VkDescriptorSetLayout downsample;
     VkDescriptorSetLayout upsample;
     VkDescriptorSetLayout blend;
@@ -143,6 +146,7 @@ class VulkanExample : public VulkanExampleBase {
     // Holds the first offscreen framebuffer
     // used by first down sample pass
     FrameBuffer original;
+    FrameBuffer brightness;
     // Holds all downsampled framebuffers
     std::array<FrameBuffer, NUM_SAMPLE_SIZES> samples;
     // Holds final bloom framebuffer
@@ -628,7 +632,7 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.pStages = shaderStages.data();
 
     // Blend pipeline
-    shaderStages[0] = loadShader(getShadersPath() + "blackhole/blend.vert.spv",
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
                                  VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] = loadShader(getShadersPath() + "blackhole/blend.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -644,9 +648,8 @@ class VulkanExample : public VulkanExampleBase {
     // Blackhole pipeline
     pipelineCI.layout = pipelineLayouts_.blackhole;
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    shaderStages[0] =
-        loadShader(getShadersPath() + "blackhole/blackhole.vert.spv",
-                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/blackhole.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -658,9 +661,8 @@ class VulkanExample : public VulkanExampleBase {
     // Downsample pipeline
     pipelineCI.layout = pipelineLayouts_.downsample;
     pipelineCI.renderPass = offscreenPass_.renderPass;
-    shaderStages[0] =
-        loadShader(getShadersPath() + "blackhole/downsample.vert.spv",
-                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/downsample.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -681,9 +683,8 @@ class VulkanExample : public VulkanExampleBase {
     blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
     blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    shaderStages[0] =
-        loadShader(getShadersPath() + "blackhole/upsample.vert.spv",
-                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[0] = loadShader(getShadersPath() + "blackhole/simple.vert.spv",
+                                 VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "blackhole/upsample.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
