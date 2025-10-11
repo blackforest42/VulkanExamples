@@ -70,7 +70,7 @@ class VulkanExample : public VulkanExampleBase {
   };
 
   struct UpsampleUBO {
-    float filterRadius{0.005f};
+    alignas(8) glm::vec2 dstResolution;
   };
 
   struct BlendUBO {
@@ -95,7 +95,7 @@ class VulkanExample : public VulkanExampleBase {
     vks::Buffer blackhole;
     vks::Buffer brightness;
     std::array<vks::Buffer, NUM_SAMPLE_SIZES> downsample;
-    vks::Buffer upsample;
+    std::array<vks::Buffer, NUM_SAMPLE_SIZES> upsample;
     vks::Buffer blend;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
@@ -191,12 +191,14 @@ class VulkanExample : public VulkanExampleBase {
       }
 
       // Upsample
-      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
-          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-          &buffer.upsample, sizeof(UpsampleUBO), &ubos_.upsample));
-      VK_CHECK_RESULT(buffer.upsample.map());
+      for (int i = 0; i < NUM_SAMPLE_SIZES; i++) {
+        VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &buffer.upsample[i], sizeof(UpsampleUBO), &ubos_.upsample));
+        VK_CHECK_RESULT(buffer.upsample[i].map());
+      }
 
       // Blend
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
@@ -313,10 +315,8 @@ class VulkanExample : public VulkanExampleBase {
       prepareOffscreenFramebuffer(&offscreenPass_.down_samples[i],
                                   FB_COLOR_FORMAT);
 
-      offscreenPass_.up_samples[i].height =
-          static_cast<uint32_t>(height_ * pow(0.5, i));
-      offscreenPass_.up_samples[i].width =
-          static_cast<uint32_t>(width_ * pow(0.5, i));
+      offscreenPass_.up_samples[i].height = static_cast<uint32_t>(height_ >> i);
+      offscreenPass_.up_samples[i].width = static_cast<uint32_t>(width_ >> i);
       prepareOffscreenFramebuffer(&offscreenPass_.up_samples[i],
                                   FB_COLOR_FORMAT);
     }
@@ -472,7 +472,6 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1)};
-
     descriptorSetLayoutCI =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
     VK_CHECK_RESULT(
@@ -489,8 +488,12 @@ class VulkanExample : public VulkanExampleBase {
         // Binding 1: Source texture to upsample
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, 1)};
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1, 1),
 
+        // Binding 2: Source texture to upsample
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 2, 1)};
     descriptorSetLayoutCI =
         vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
     VK_CHECK_RESULT(
@@ -498,17 +501,17 @@ class VulkanExample : public VulkanExampleBase {
                                     &descriptorSetLayouts_.upsample));
     // Layout: Blend
     setLayoutBindings = {
-        // Binding 0 : uniform buffer for tonemappng
+        // Binding 0 : uniform buffer
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 0),
 
-        // Binding 1 : Src texture map
+        // Binding 1 : up sampled texture map
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1),
 
-        // Binding 2 : Bloom texture map
+        // Binding 2 : down sample texture map
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 2)};
@@ -606,11 +609,24 @@ class VulkanExample : public VulkanExampleBase {
             vks::initializers::writeDescriptorSet(
                 descriptorSets_[i].upsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /*binding id*/ 0, &uniformBuffers_[i].upsample.descriptor),
+                /*binding id*/ 0,
+                &uniformBuffers_[i].upsample[sample_level].descriptor),
+
             vks::initializers::writeDescriptorSet(
                 descriptorSets_[i].upsamples[sample_level],
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 1,
-                &offscreenPass_.down_samples[sample_level].descriptor)};
+                sample_level == NUM_SAMPLE_SIZES - 1
+                    ? &offscreenPass_.down_samples[sample_level].descriptor
+                    : &offscreenPass_.up_samples[sample_level + 1].descriptor),
+
+            vks::initializers::writeDescriptorSet(
+                descriptorSets_[i].upsamples[sample_level],
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, /*binding id*/ 2,
+                sample_level == 0
+                    ? &offscreenPass_.brightness.descriptor
+                    : &offscreenPass_.down_samples[sample_level - 1]
+                           .descriptor),
+        };
         vkUpdateDescriptorSets(
             device_, static_cast<uint32_t>(writeDescriptorSets.size()),
             writeDescriptorSets.data(), 0, nullptr);
@@ -633,7 +649,7 @@ class VulkanExample : public VulkanExampleBase {
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 2,  // &offscreenPass_.final.descriptor)};
-              &offscreenPass_.brightness.descriptor)};
+              &offscreenPass_.up_samples[0].descriptor)};
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
@@ -805,9 +821,6 @@ class VulkanExample : public VulkanExampleBase {
     memcpy(uniformBuffers_[currentBuffer_].brightness.mapped, &ubos_.brightness,
            sizeof(BrightnessUBO));
 
-    memcpy(uniformBuffers_[currentBuffer_].upsample.mapped, &ubos_.upsample,
-           sizeof(UpsampleUBO));
-
     ubos_.blend.tonemappingEnabled = toneMappingEnabled;
     memcpy(uniformBuffers_[currentBuffer_].blend.mapped, &ubos_.blend,
            sizeof(BlendUBO));
@@ -903,7 +916,7 @@ class VulkanExample : public VulkanExampleBase {
     downSamplingCmdBuffer(cmdBuffer);
 
     // Up sampling
-    // upSamplingCmdBuffer(cmdBuffer);
+    upSamplingCmdBuffer(cmdBuffer);
 
     // Blend
     {
@@ -1004,10 +1017,15 @@ class VulkanExample : public VulkanExampleBase {
 
     for (int sample_level = NUM_SAMPLE_SIZES - 1; sample_level >= 0;
          sample_level--) {
+      ubos_.upsample.dstResolution =
+          glm::vec2(offscreenPass_.up_samples[sample_level].width,
+                    offscreenPass_.up_samples[sample_level].height);
+      memcpy(uniformBuffers_[currentBuffer_].upsample[sample_level].mapped,
+             &ubos_.upsample, sizeof(DownsampleUBO));
+
       // Set render fb target
       const VulkanExample::FrameBuffer& fb =
-          sample_level == 0 ? offscreenPass_.final
-                            : offscreenPass_.down_samples[sample_level - 1];
+          offscreenPass_.up_samples[sample_level];
       renderPassBeginInfo.framebuffer = fb.framebuffer;
       renderPassBeginInfo.renderArea.extent.width = fb.width;
       renderPassBeginInfo.renderArea.extent.height = fb.height;
@@ -1061,8 +1079,6 @@ class VulkanExample : public VulkanExampleBase {
                            &ubos_.blackhole.accDiskSpeed, 0.0, 2.0);
       overlay->checkBox("Tone Mapping Enabled", &toneMappingEnabled);
       overlay->sliderFloat("Exposure", &ubos_.blend.exposure, 0.1f, 10.0f);
-      overlay->sliderFloat("Bloom Radius", &ubos_.upsample.filterRadius, 0.005f,
-                           .01f);
       overlay->sliderFloat("Bloom Strength", &ubos_.blend.bloomStrength, 0.0f,
                            1.0f);
     }
