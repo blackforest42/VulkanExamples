@@ -26,6 +26,10 @@ void main() {
 	vec3 blackholeColor = texture(blackholeTex, inUV).rgb;
 	vec3 upSampledColor = texture(upSampledTex, inUV).rgb;
 
+	// Debug
+	// outFragColor = vec4(upSampledColor, 1.);
+	// return;
+
 	// linear interpolation
 	vec3 result = mix(blackholeColor, upSampledColor, ubo.bloomStrength);
 	// Orignal mixing procedure
