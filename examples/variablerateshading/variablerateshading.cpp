@@ -114,7 +114,7 @@ void VulkanExample::setupRenderPass()
 	std::array<VkAttachmentDescription2KHR, 3> attachments = {};
 	// Color attachment
 	attachments[0].sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
-	attachments[0].format = swapChain_.colorFormat;
+	attachments[0].format = swapChain_.colorFormat_;
 	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;

@@ -268,7 +268,7 @@ void VulkanExampleBase::prepare() {
                    VK_SHADER_STAGE_FRAGMENT_BIT),
     };
     ui_.prepareResources();
-    ui_.preparePipeline(pipelineCache_, renderPass_, swapChain_.colorFormat,
+    ui_.preparePipeline(pipelineCache_, renderPass_, swapChain_.colorFormat_,
                         depthFormat_);
   }
 }
@@ -3069,7 +3069,7 @@ void VulkanExampleBase::setupRenderPass() {
   std::array<VkAttachmentDescription, 2> attachments{
       // Color attachment
       VkAttachmentDescription{
-          .format = swapChain_.colorFormat,
+          .format = swapChain_.colorFormat_,
           .samples = VK_SAMPLE_COUNT_1_BIT,
           .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
           .storeOp = VK_ATTACHMENT_STORE_OP_STORE,

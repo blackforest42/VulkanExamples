@@ -627,7 +627,7 @@ public:
 		// Attachment information for dynamic rendering
 		VkPipelineRenderingCreateInfoKHR pipelineRenderingCI{ VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
 		pipelineRenderingCI.colorAttachmentCount = 1;
-		pipelineRenderingCI.pColorAttachmentFormats = &swapChain_.colorFormat;
+		pipelineRenderingCI.pColorAttachmentFormats = &swapChain_.colorFormat_;
 		pipelineRenderingCI.depthAttachmentFormat = depthFormat_;
 		pipelineRenderingCI.stencilAttachmentFormat = depthFormat_;
 

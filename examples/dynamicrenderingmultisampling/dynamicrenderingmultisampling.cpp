@@ -96,7 +96,7 @@ public:
 		vkFreeMemory(device_, renderImage.memory, nullptr);
 		VkImageCreateInfo renderImageCI = vks::initializers::imageCreateInfo();
 		renderImageCI.imageType = VK_IMAGE_TYPE_2D;
-		renderImageCI.format = swapChain_.colorFormat;
+		renderImageCI.format = swapChain_.colorFormat_;
 		renderImageCI.extent = { width_, height_, 1 };
 		renderImageCI.mipLevels = 1;
 		renderImageCI.arrayLayers = 1;
@@ -116,7 +116,7 @@ public:
 		VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 		imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		imageViewCI.image = renderImage.image;
-		imageViewCI.format = swapChain_.colorFormat;
+		imageViewCI.format = swapChain_.colorFormat_;
 		imageViewCI.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 		VK_CHECK_RESULT(vkCreateImageView(device_, &imageViewCI, nullptr, &renderImage.view));
 	}
@@ -242,7 +242,7 @@ public:
 		VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{};
 		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain_.colorFormat;
+		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain_.colorFormat_;
 		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat_;
 		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat_;
 		// Chain into the pipeline creat einfo

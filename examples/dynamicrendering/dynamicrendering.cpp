@@ -160,7 +160,7 @@ public:
 		VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{};
 		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
 		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain_.colorFormat;
+		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain_.colorFormat_;
 		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat_;
 		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat_;
 		// Chain into the pipeline creat einfo

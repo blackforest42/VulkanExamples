@@ -107,7 +107,7 @@ public:
 		// Color target
 		VkImageCreateInfo info = vks::initializers::imageCreateInfo();
 		info.imageType = VK_IMAGE_TYPE_2D;
-		info.format = swapChain_.colorFormat;
+		info.format = swapChain_.colorFormat_;
 		info.extent.width = width_;
 		info.extent.height = height_;
 		info.extent.depth = 1;
@@ -142,7 +142,7 @@ public:
 		VkImageViewCreateInfo viewInfo = vks::initializers::imageViewCreateInfo();
 		viewInfo.image = multisampleTarget.color.image;
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		viewInfo.format = swapChain_.colorFormat;
+		viewInfo.format = swapChain_.colorFormat_;
 		viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
 		viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
 		viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
@@ -212,7 +212,7 @@ public:
 		std::array<VkAttachmentDescription, 3> attachments = {};
 
 		// Multisampled attachment that we render to
-		attachments[0].format = swapChain_.colorFormat;
+		attachments[0].format = swapChain_.colorFormat_;
 		attachments[0].samples = sampleCount;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -223,7 +223,7 @@ public:
 
 		// This is the frame buffer attachment to where the multisampled image
 		// will be resolved to and which will be presented to the swapchain
-		attachments[1].format = swapChain_.colorFormat;
+		attachments[1].format = swapChain_.colorFormat_;
 		attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;

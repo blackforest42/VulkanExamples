@@ -229,7 +229,7 @@ public:
 
 		VkImageCreateInfo image = vks::initializers::imageCreateInfo();
 		image.imageType = VK_IMAGE_TYPE_2D;
-		image.format = swapChain_.colorFormat;
+		image.format = swapChain_.colorFormat_;
 		image.extent.width = width_;
 		image.extent.height = height_;
 		image.extent.depth = 1;
@@ -251,7 +251,7 @@ public:
 
 		VkImageViewCreateInfo colorImageView = vks::initializers::imageViewCreateInfo();
 		colorImageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		colorImageView.format = swapChain_.colorFormat;
+		colorImageView.format = swapChain_.colorFormat_;
 		colorImageView.subresourceRange = {};
 		colorImageView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		colorImageView.subresourceRange.baseMipLevel = 0;

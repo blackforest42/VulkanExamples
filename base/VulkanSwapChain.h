@@ -37,8 +37,8 @@ class VulkanSwapChain {
   VkSurfaceKHR surface{VK_NULL_HANDLE};
 
  public:
-  VkFormat colorFormat{};
-  VkColorSpaceKHR colorSpace{};
+  VkFormat colorFormat_{};
+  VkColorSpaceKHR colorSpace_{};
   VkSwapchainKHR swapChain_{VK_NULL_HANDLE};
   std::vector<VkImage> images_{};
   std::vector<VkImageView> imageViews_{};

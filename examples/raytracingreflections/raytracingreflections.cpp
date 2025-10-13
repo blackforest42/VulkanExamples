@@ -429,7 +429,7 @@ public:
 	void handleResize()
 	{
 		// Recreate image
-		createStorageImage(swapChain_.colorFormat, { width_, height_, 1 });
+		createStorageImage(swapChain_.colorFormat_, { width_, height_, 1 });
 		// Update descriptors
 		VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, storageImage.view, VK_IMAGE_LAYOUT_GENERAL };
 		for (auto i = 0; i < MAX_CONCURRENT_FRAMES; i++) {
@@ -474,7 +474,7 @@ public:
 		createBottomLevelAccelerationStructure();
 		createTopLevelAccelerationStructure();
 
-		createStorageImage(swapChain_.colorFormat, { width_, height_, 1 });
+		createStorageImage(swapChain_.colorFormat_, { width_, height_, 1 });
 		createUniformBuffer();
 		createRayTracingPipeline();
 		createShaderBindingTables();

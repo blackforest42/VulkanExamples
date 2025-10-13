@@ -159,7 +159,7 @@ public:
 		{
 			VkImageCreateInfo imageCI = vks::initializers::imageCreateInfo();
 			imageCI.imageType = VK_IMAGE_TYPE_2D;
-			imageCI.format = swapChain_.colorFormat;
+			imageCI.format = swapChain_.colorFormat_;
 			imageCI.extent = { width_, height_, 1 };
 			imageCI.mipLevels = 1;
 			imageCI.arrayLayers = multiviewLayerCount;
@@ -179,7 +179,7 @@ public:
 
 			VkImageViewCreateInfo imageViewCI = vks::initializers::imageViewCreateInfo();
 			imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			imageViewCI.format = swapChain_.colorFormat;
+			imageViewCI.format = swapChain_.colorFormat_;
 			imageViewCI.flags = 0;
 			imageViewCI.subresourceRange = {};
 			imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -217,7 +217,7 @@ public:
 		{
 			std::array<VkAttachmentDescription, 2> attachments = {};
 			// Color attachment
-			attachments[0].format = swapChain_.colorFormat;
+			attachments[0].format = swapChain_.colorFormat_;
 			attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;

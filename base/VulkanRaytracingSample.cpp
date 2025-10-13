@@ -25,7 +25,7 @@ void VulkanRaytracingSample::setupRenderPass()
 
 	std::array<VkAttachmentDescription, 2> attachments{
 		VkAttachmentDescription{
-			.format = swapChain_.colorFormat,
+			.format = swapChain_.colorFormat_,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = colorLoadOp,
 			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,

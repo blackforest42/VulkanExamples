@@ -149,7 +149,7 @@ public:
 		VkFormatProperties formatProps;
 
 		// Check if the device supports blitting from optimal images (the swapchain images are in optimal format)
-		vkGetPhysicalDeviceFormatProperties(physicalDevice_, swapChain_.colorFormat, &formatProps);
+		vkGetPhysicalDeviceFormatProperties(physicalDevice_, swapChain_.colorFormat_, &formatProps);
 		if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)) {
 			std::cerr << "Device does not support blitting from optimal tiled images, using copy instead of blit!" << std::endl;
 			supportsBlit = false;
@@ -314,7 +314,7 @@ public:
 		if (!supportsBlit)
 		{
 			std::vector<VkFormat> formatsBGR = { VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SNORM };
-			colorSwizzle = (std::find(formatsBGR.begin(), formatsBGR.end(), swapChain_.colorFormat) != formatsBGR.end());
+			colorSwizzle = (std::find(formatsBGR.begin(), formatsBGR.end(), swapChain_.colorFormat_) != formatsBGR.end());
 		}
 
 		// ppm binary pixel data
