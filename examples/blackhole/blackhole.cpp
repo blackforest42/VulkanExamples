@@ -40,7 +40,7 @@ class VulkanExample : public VulkanExampleBase {
   bool karisAverageEnabled = true;
 
   // Debugging
-  int DOWN_SAMPLE_IDX = 3;
+  int DEBUG_IDX = 3;
   bool DEBUG_BLACKHOLE = true;
 
   struct BlackholeUBO {
@@ -653,11 +653,12 @@ class VulkanExample : public VulkanExampleBase {
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 2, &offscreenPass_.up_samples[0].descriptor),
+          /*this descriptor is a texture for debugging only*/
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].blend,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 3,
-              &offscreenPass_.down_samples[DOWN_SAMPLE_IDX].descriptor)};
+              &offscreenPass_.down_samples[DEBUG_IDX].descriptor)};
 
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
