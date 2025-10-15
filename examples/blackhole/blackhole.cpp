@@ -40,8 +40,8 @@ class VulkanExample : public VulkanExampleBase {
   bool karisAverageEnabled = true;
 
   // Debugging
-  int DEBUG_IDX = 3;
-  bool DEBUG_BLACKHOLE = true;
+  int DEBUG_IDX = 1;
+  bool DEBUG_BLACKHOLE = false;
 
   struct BlackholeUBO {
     alignas(16) glm::mat4 cameraView;
@@ -984,6 +984,19 @@ class VulkanExample : public VulkanExampleBase {
                         pipelines_.downsample);
       vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
 
+      // IMPORTANT: This barrier is to serialize WRITES BEFORE READS
+      {
+        VkMemoryBarrier memBarrier = {};
+        memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
+                             nullptr, 0, nullptr);
+      }
+
       vkCmdEndRenderPass(cmdBuffer);
     }
   }
@@ -1032,6 +1045,19 @@ class VulkanExample : public VulkanExampleBase {
       vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                         pipelines_.upsample);
       vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+      // IMPORTANT: This barrier is to serialize WRITES BEFORE READS
+      {
+        VkMemoryBarrier memBarrier = {};
+        memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
+                             nullptr, 0, nullptr);
+      }
 
       vkCmdEndRenderPass(cmdBuffer);
     }
