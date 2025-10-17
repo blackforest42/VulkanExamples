@@ -45,15 +45,16 @@ class VulkanExample : public VulkanExampleBase {
 
   // Resources for the graphics part of the example
   struct Graphics {
-    uint32_t
-        queueFamilyIndex;  // Used to check if compute and graphics queue
-                           // families differ and require additional barriers
-    VkDescriptorSetLayout
-        descriptorSetLayout;  // Particle system rendering shader binding layout
-    std::array<VkDescriptorSet, MAX_CONCURRENT_FRAMES>
-        descriptorSets;  // Particle system rendering shader bindings
-    VkPipelineLayout pipelineLayout;  // Layout of the graphics pipeline
-    VkPipeline pipeline;              // Particle rendering pipeline
+    // families differ and require additional barriers
+    uint32_t queueFamilyIndex;
+    // Particle system rendering shader binding layout
+    VkDescriptorSetLayout descriptorSetLayout;
+    // Particle system rendering shader bindings
+    std::array<VkDescriptorSet, MAX_CONCURRENT_FRAMES> descriptorSets;
+    // Layout of the graphics pipeline
+    VkPipelineLayout pipelineLayout;
+    // Particle rendering pipeline
+    VkPipeline pipeline;
     struct UniformData {
       glm::mat4 projection;
       glm::mat4 view;
