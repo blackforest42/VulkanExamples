@@ -1,3 +1,2 @@
-Oct 13
-	- When displaying down_samples[i=1] to screen, small squares appear
-	- Colour Pass #4
+Oct 20
+	- No accretion disk spinning in Linux
