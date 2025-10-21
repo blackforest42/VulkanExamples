@@ -245,4 +245,9 @@ libs/vulkan/*.so
 __pycache__**
 
 examples/*/*.ini
+
+## Do not add textures from blackhole, too large
 assets/textures/blackhole
+
+## CLion
+.idea
