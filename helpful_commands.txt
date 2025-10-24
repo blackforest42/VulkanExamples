@@ -1,11 +1,7 @@
 # Compile shaders
 
 glslc simple.vert -o simple.vert.spv
-glslc blackhole.frag -o blackhole.frag.spv
-glslc brightness.frag -o brightness.frag.spv
-glslc downsample.frag -o downsample.frag.spv
-glslc upsample.frag -o upsample.frag.spv
-glslc blend.frag -o blend.frag.spv
+glslc simple.frag -o simple.frag.spv
 
 
 # Use `toktx` to create a .ktx cubemap from 6 .png files

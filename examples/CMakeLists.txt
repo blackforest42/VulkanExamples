@@ -113,6 +113,7 @@ set(EXAMPLES
 	dynamicrenderingmultisampling
 	dynamicstate
 	dynamicuniformbuffer	
+	fluidsim
 	fragmentshaderbarycentrics
 	gears
 	geometryshader
