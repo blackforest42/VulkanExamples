@@ -1,0 +1,56 @@
+#version 450
+#extension GL_EXT_debug_printf : enable
+
+// in
+layout (location = 0) in vec2 inUV;
+
+// out
+layout (location = 0) out vec4 outFragColor;
+
+layout (binding = 0) uniform UBO
+{
+    vec2 bufferResolution;
+} ubo;
+
+layout (binding = 1) uniform sampler2D field1;
+
+
+void main() {
+	float x = gl_FragCoord.x - 0.5;
+	float y = gl_FragCoord.y - 0.5;
+	float width = ubo.bufferResolution.x;
+	float height = ubo.bufferResolution.y;
+
+	vec2 dudv = 1 / ubo.bufferResolution;
+
+	outFragColor = texture(field1, inUV);
+
+	// skip corners
+	if (x == 0 && y == 0) {
+		return;
+	}
+	if (x == 0 && y == height - 1) {
+		return;
+	}
+	if (x == width - 1 && y == 0) {
+		return;
+	}
+	if (x == width - 1 && y == height - 1) {
+		return;
+	}
+
+	// boundaries
+	if (x == 0) {
+		outFragColor = texture(field1, inUV + vec2(dudv.x, 0));
+	}
+	else if (x == ubo.bufferResolution.x - 1) {
+		outFragColor = texture(field1, inUV + vec2(-dudv.x, 0));
+	}
+	else if (y == 0) {
+		outFragColor = texture(field1, inUV + vec2(0, dudv.y));
+	}
+	else if (y == ubo.bufferResolution.y - 1) {
+		outFragColor = texture(field1, inUV + vec2(0, -dudv.y));
+	}
+	return; 
+}
