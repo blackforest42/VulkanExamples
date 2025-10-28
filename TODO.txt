@@ -11,8 +11,7 @@ Long term:
 	- add ink?
 
 
-
-
+### Fluid sim
 1. Advection
 advection(float timestep, float rdx, u=velocity_field, x=velocity_field) -> velocity_field
 

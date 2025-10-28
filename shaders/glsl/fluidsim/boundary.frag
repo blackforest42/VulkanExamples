@@ -10,6 +10,7 @@ layout (location = 0) out vec4 outFragColor;
 layout (binding = 0) uniform UBO
 {
     vec2 bufferResolution;
+	float scale;
 } ubo;
 
 layout (binding = 1) uniform sampler2D field1;
@@ -41,16 +42,20 @@ void main() {
 
 	// boundaries
 	if (x == 0) {
-		outFragColor = texture(field1, inUV + vec2(dudv.x, 0));
+		outFragColor = ubo.scale * texture(field1, inUV + vec2(dudv.x, 0));
+		return;
 	}
 	else if (x == ubo.bufferResolution.x - 1) {
-		outFragColor = texture(field1, inUV + vec2(-dudv.x, 0));
+		outFragColor = ubo.scale * texture(field1, inUV + vec2(-dudv.x, 0));
+		return;
 	}
 	else if (y == 0) {
-		outFragColor = texture(field1, inUV + vec2(0, dudv.y));
+		outFragColor = ubo.scale * texture(field1, inUV + vec2(0, dudv.y));
+		return;
 	}
 	else if (y == ubo.bufferResolution.y - 1) {
-		outFragColor = texture(field1, inUV + vec2(0, -dudv.y));
+		outFragColor = ubo.scale * texture(field1, inUV + vec2(0, -dudv.y));
+		return;
 	}
 	return; 
 }

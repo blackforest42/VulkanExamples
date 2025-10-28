@@ -9,11 +9,12 @@ layout (location = 0) out vec4 outFragColor;
 
 layout (binding = 0) uniform UBO
 {
-    vec2 viewportResolution;
+	float alpha;
+	float rBeta;
 } ubo;
 
-layout (binding = 1) uniform sampler2D field1;
-layout (binding = 2) uniform sampler2D field2;
+layout (binding = 1) uniform sampler2D field1; // 'x' texture
+layout (binding = 2) uniform sampler2D field2; // 'b' texture
 
 
 void main() {
@@ -35,6 +36,6 @@ void main() {
 	// b sample, from center
 	vec4 bC = texture(field2, coords);
 	// evaluate Jacobi iteration
-	outFragColor = (xL + xR + xB + xT + alpha * bC) * rBeta;
+	outFragColor = (xL + xR + xB + xT + ubo.alpha * bC) * ubo.rBeta;
 
 }
