@@ -11,16 +11,18 @@ layout (location = 0) out vec4 outFragColor;
 layout (binding = 0) uniform sampler2D velocityFieldTex;
 layout (binding = 1) uniform sampler2D pressureFieldTex;
 
-// takes an un-normalized vec3 and converts to normalized [0 - 1] vec3
-vec3 vector2color(vec3 vector) {
+// takes an un-normalized vec2 and converts to normalized [0 - 1] vec3
+vec2 vector2color(vec2 vector) {
 	vector = normalize(vector);
-	vec3 rgb = (vector + vec3(1.0)) / 2.f;
-	return rgb;
+	vec2 result = (vector + vec2(1.0)) / 2.f;
+	return result;
 }
 
 void main() {
 	vec2 coords = gl_FragCoord.xy;
 	vec4 texel = texture(velocityFieldTex, inUV);
-
-	outFragColor = vec4(vector2color(texel.xyz), 1.f);
+	vec2 normalized_rgb = vector2color(texel.xy);
+	outFragColor = vec4(0, 0, 0, 1);
+	// Preference: drop the 'red' channel, keep green and blue
+	outFragColor.rgb = vec3(0.0f, normalized_rgb);
 }

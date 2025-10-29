@@ -61,6 +61,7 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorSetLayout boundary;
     VkDescriptorSetLayout jacobi;
     VkDescriptorSetLayout divergence;
+    VkDescriptorSetLayout gradient;
     VkDescriptorSetLayout colorPass;
   } descriptorSetLayouts_{};
 
@@ -71,6 +72,7 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorSet jacobiVelocity;
     VkDescriptorSet jacobiPressure;
     VkDescriptorSet divergence;
+    VkDescriptorSet gradient;
     VkDescriptorSet colorPass;
   };
   std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
@@ -80,6 +82,7 @@ class VulkanExample : public VulkanExampleBase {
     VkPipelineLayout boundary;
     VkPipelineLayout jacobi;
     VkPipelineLayout divergence;
+    VkPipelineLayout gradient;
     VkPipelineLayout colorPass;
   } pipelineLayouts_{};
 
@@ -88,6 +91,7 @@ class VulkanExample : public VulkanExampleBase {
     VkPipeline boundary;
     VkPipeline jacobi;
     VkPipeline divergence;
+    VkPipeline gradient;
     VkPipeline colorPass;
   } pipelines_{};
 
@@ -287,7 +291,7 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(
             poolSizes,
-            /* max number of descriptor sets that can be allocated at once*/ 7 *
+            /* max number of descriptor sets that can be allocated at once*/ 8 *
                 MAX_CONCURRENT_FRAMES);
     VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
                                            nullptr, &descriptorPool_));
@@ -378,6 +382,26 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.divergence));
+
+    // Layout: Gradient
+    setLayoutBindings = {
+        // Binding 0 : velocity field
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),
+        // Binding 1 : pressure field
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 1),
+    };
+    descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(
+        setLayoutBindings.data(),
+        static_cast<uint32_t>(setLayoutBindings.size()));
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.gradient));
 
     // Layout: Color pass
     setLayoutBindings = {
@@ -525,6 +549,25 @@ class VulkanExample : public VulkanExampleBase {
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
+      // Gradient
+      allocInfo = vks::initializers::descriptorSetAllocateInfo(
+          descriptorPool_, &descriptorSetLayouts_.gradient, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].gradient));
+      writeDescriptorSets = {
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].gradient,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              /*binding id*/ 0, &velocity_field_[0].descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].gradient,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              /*binding id*/ 1, &pressure_field_[0].descriptor),
+      };
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
+
       // Color pass
       allocInfo = vks::initializers::descriptorSetAllocateInfo(
           descriptorPool_, &descriptorSetLayouts_.colorPass, 1);
@@ -552,18 +595,27 @@ class VulkanExample : public VulkanExampleBase {
             &descriptorSetLayouts_.advection, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.advection));
+
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
-        &descriptorSetLayouts_.colorPass, 1);
+        &descriptorSetLayouts_.boundary, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.boundary));
+
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
-        &descriptorSetLayouts_.colorPass, 1);
+        &descriptorSetLayouts_.jacobi, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.jacobi));
+
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
-        &descriptorSetLayouts_.colorPass, 1);
+        &descriptorSetLayouts_.divergence, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.divergence));
+
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.gradient, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.gradient));
+
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
         &descriptorSetLayouts_.colorPass, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
@@ -648,6 +700,15 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelineCI, nullptr,
                                               &pipelines_.divergence));
 
+    // Gradient pipeline
+    pipelineCI.layout = pipelineLayouts_.gradient;
+    shaderStages[1] =
+        loadShader(getShadersPath() + "fluidsim/colorpass.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.gradient));
+
     // Color pass pipeline
     pipelineCI.layout = pipelineLayouts_.colorPass;
     shaderStages[1] =
@@ -692,25 +753,29 @@ class VulkanExample : public VulkanExampleBase {
               velocity_field_[0].color.image);
 
     // Jacobi: Viscous Diffusion
-    // for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-    //  velocityBoundaryCmd(cmdBuffer);
-    //  velocityJacobiCmd(cmdBuffer);
-    //  copyImage(cmdBuffer, velocity_field_[1].color.image,
-    //            velocity_field_[0].color.image);
-    //}
+    for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
+      velocityBoundaryCmd(cmdBuffer);
+      velocityJacobiCmd(cmdBuffer);
+      copyImage(cmdBuffer, velocity_field_[1].color.image,
+                velocity_field_[0].color.image);
+    }
 
-    //// Divergence
-    // divergenceCmd(cmdBuffer);
+    // Divergence
+    divergenceCmd(cmdBuffer);
 
-    //// Jacobi: Projection
-    // for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-    //   pressureBoundaryCmd(cmdBuffer);
-    //   pressureJacobiCmd(cmdBuffer);
-    //   copyImage(cmdBuffer, pressure_field_[1].color.image,
-    //             pressure_field_[0].color.image);
-    // }
+    // Jacobi: Projection
+    for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
+      pressureBoundaryCmd(cmdBuffer);
+      pressureJacobiCmd(cmdBuffer);
+      copyImage(cmdBuffer, pressure_field_[1].color.image,
+                pressure_field_[0].color.image);
+    }
 
     // Gradient subtraction
+    velocityBoundaryCmd(cmdBuffer);
+    gradientCmd(cmdBuffer);
+    copyImage(cmdBuffer, velocity_field_[1].color.image,
+              velocity_field_[0].color.image);
 
     // Color pass
     colorPassCmd(cmdBuffer);
@@ -793,8 +858,6 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::renderPassBeginInfo();
     renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
     renderPassBeginInfo.framebuffer = output_field[1].framebuffer;
-    // renderPassBeginInfo.renderPass = renderPass_;
-    // renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
     renderPassBeginInfo.renderArea.offset.x = 0;
     renderPassBeginInfo.renderArea.offset.y = 0;
     renderPassBeginInfo.renderArea.extent.width = width_;
@@ -940,6 +1003,41 @@ class VulkanExample : public VulkanExampleBase {
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
+    vkCmdEndRenderPass(cmdBuffer);
+  }
+
+  void gradientCmd(VkCommandBuffer& cmdBuffer) {
+    VkClearValue clearValues{};
+    clearValues.color = {0.f, 0.0f, 0.0f, 0.f};
+
+    VkRenderPassBeginInfo renderPassBeginInfo =
+        vks::initializers::renderPassBeginInfo();
+    renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+    renderPassBeginInfo.framebuffer = velocity_field_[1].framebuffer;
+    renderPassBeginInfo.renderArea.offset.x = SLAB_OFFSET;
+    renderPassBeginInfo.renderArea.offset.y = SLAB_OFFSET;
+    renderPassBeginInfo.renderArea.extent.width = width_ - 2 * SLAB_OFFSET;
+    renderPassBeginInfo.renderArea.extent.height = height_ - 2 * SLAB_OFFSET;
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValues;
+
+    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+    VkViewport viewport =
+        vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.gradient,
+        0, 1, &descriptorSets_[currentBuffer_].gradient, 0, nullptr);
+
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipelines_.gradient);
+    vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+    drawUI(cmdBuffer);
     vkCmdEndRenderPass(cmdBuffer);
   }
 
