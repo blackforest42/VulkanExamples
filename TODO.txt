@@ -1,7 +1,6 @@
 Oct 27
 	- start gradient pipelines
 	- start force/impulse pipelines
-	- map vector field to an RGB colors
 
 
 ### Fluid sim

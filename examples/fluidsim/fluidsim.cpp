@@ -75,7 +75,13 @@ class VulkanExample : public VulkanExampleBase {
   };
   std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
 
-  VkPipelineLayout pipelineLayout_{};
+  struct {
+    VkPipelineLayout advection;
+    VkPipelineLayout boundary;
+    VkPipelineLayout jacobi;
+    VkPipelineLayout divergence;
+    VkPipelineLayout colorPass;
+  } pipelineLayouts_{};
 
   struct {
     VkPipeline advection;
@@ -545,7 +551,23 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::pipelineLayoutCreateInfo(
             &descriptorSetLayouts_.advection, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
-                                           &pipelineLayout_));
+                                           &pipelineLayouts_.advection));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.colorPass, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.boundary));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.colorPass, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.jacobi));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.colorPass, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.divergence));
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.colorPass, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.colorPass));
 
     // Pipeline
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
@@ -575,7 +597,8 @@ class VulkanExample : public VulkanExampleBase {
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
     VkGraphicsPipelineCreateInfo pipelineCI =
-        vks::initializers::pipelineCreateInfo(pipelineLayout_, renderPass_, 0);
+        vks::initializers::pipelineCreateInfo(pipelineLayouts_.advection,
+                                              renderPass_, 0);
     pipelineCI.pInputAssemblyState = &inputAssemblyState;
     pipelineCI.pRasterizationState = &rasterizationState;
     pipelineCI.pColorBlendState = &colorBlendState;
@@ -590,7 +613,7 @@ class VulkanExample : public VulkanExampleBase {
     VkPipelineVertexInputStateCreateInfo emptyInputState =
         vks::initializers::pipelineVertexInputStateCreateInfo();
     pipelineCI.pVertexInputState = &emptyInputState;
-    pipelineCI.layout = pipelineLayout_;
+    pipelineCI.layout = pipelineLayouts_.advection;
     shaderStages[0] = loadShader(getShadersPath() + "fluidsim/simple.vert.spv",
                                  VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
@@ -601,7 +624,7 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelines_.advection));
 
     // Boundary pipeline
-    pipelineCI.layout = pipelineLayout_;
+    pipelineCI.layout = pipelineLayouts_.boundary;
     shaderStages[1] =
         loadShader(getShadersPath() + "fluidsim/boundary.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -610,14 +633,14 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelines_.boundary));
 
     // Jacobi pipeline
-    pipelineCI.layout = pipelineLayout_;
+    pipelineCI.layout = pipelineLayouts_.jacobi;
     shaderStages[1] = loadShader(getShadersPath() + "fluidsim/jacobi.frag.spv",
                                  VK_SHADER_STAGE_FRAGMENT_BIT);
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.jacobi));
 
     // Divergence pipeline
-    pipelineCI.layout = pipelineLayout_;
+    pipelineCI.layout = pipelineLayouts_.divergence;
     shaderStages[1] =
         loadShader(getShadersPath() + "fluidsim/divergence.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -626,7 +649,7 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelines_.divergence));
 
     // Color pass pipeline
-    pipelineCI.layout = pipelineLayout_;
+    pipelineCI.layout = pipelineLayouts_.colorPass;
     shaderStages[1] =
         loadShader(getShadersPath() + "fluidsim/colorpass.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -669,23 +692,23 @@ class VulkanExample : public VulkanExampleBase {
               velocity_field_[0].color.image);
 
     // Jacobi: Viscous Diffusion
-    for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-      velocityBoundaryCmd(cmdBuffer);
-      velocityJacobiCmd(cmdBuffer);
-      copyImage(cmdBuffer, velocity_field_[1].color.image,
-                velocity_field_[0].color.image);
-    }
+    // for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
+    //  velocityBoundaryCmd(cmdBuffer);
+    //  velocityJacobiCmd(cmdBuffer);
+    //  copyImage(cmdBuffer, velocity_field_[1].color.image,
+    //            velocity_field_[0].color.image);
+    //}
 
-    // Divergence
-    divergenceCmd(cmdBuffer);
+    //// Divergence
+    // divergenceCmd(cmdBuffer);
 
-    // Jacobi: Projection
-    for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-      pressureBoundaryCmd(cmdBuffer);
-      pressureJacobiCmd(cmdBuffer);
-      copyImage(cmdBuffer, pressure_field_[1].color.image,
-                pressure_field_[0].color.image);
-    }
+    //// Jacobi: Projection
+    // for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
+    //   pressureBoundaryCmd(cmdBuffer);
+    //   pressureJacobiCmd(cmdBuffer);
+    //   copyImage(cmdBuffer, pressure_field_[1].color.image,
+    //             pressure_field_[0].color.image);
+    // }
 
     // Gradient subtraction
 
@@ -713,8 +736,6 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
         vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
     vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
@@ -723,8 +744,8 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     vkCmdBindDescriptorSets(
-        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
-        &descriptorSets_[currentBuffer_].advection, 0, nullptr);
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.advection,
+        0, 1, &descriptorSets_[currentBuffer_].advection, 0, nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.advection);
@@ -784,8 +805,6 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
         vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
     vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
@@ -794,7 +813,8 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout_, 0, 1, descriptor_set, 0, nullptr);
+                            pipelineLayouts_.boundary, 0, 1, descriptor_set, 0,
+                            nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.boundary);
@@ -845,8 +865,6 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
         vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
     vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
@@ -855,7 +873,8 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout_, 0, 1, descriptor_set, 0, nullptr);
+                            pipelineLayouts_.jacobi, 0, 1, descriptor_set, 0,
+                            nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.jacobi);
@@ -894,8 +913,6 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
         vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
     vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
@@ -904,8 +921,8 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     vkCmdBindDescriptorSets(
-        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
-        &descriptorSets_[currentBuffer_].divergence, 0, nullptr);
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.divergence,
+        0, 1, &descriptorSets_[currentBuffer_].divergence, 0, nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.divergence);
@@ -928,21 +945,18 @@ class VulkanExample : public VulkanExampleBase {
 
   void colorPassCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
-    renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
-    renderPassBeginInfo.framebuffer = frameBuffers_[currentBuffer_];
+    renderPassBeginInfo.renderPass = renderPass_;
+    renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
     renderPassBeginInfo.renderArea.offset.x = 0;
     renderPassBeginInfo.renderArea.offset.y = 0;
     renderPassBeginInfo.renderArea.extent.width = width_;
     renderPassBeginInfo.renderArea.extent.height = height_;
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
-
-    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
@@ -954,13 +968,13 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     vkCmdBindDescriptorSets(
-        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
-        &descriptorSets_[currentBuffer_].colorPass, 0, nullptr);
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.colorPass,
+        0, 1, &descriptorSets_[currentBuffer_].colorPass, 0, nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.colorPass);
     vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
-
+    drawUI(cmdBuffer);
     vkCmdEndRenderPass(cmdBuffer);
   }
 
@@ -1082,7 +1096,11 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroyPipeline(device_, pipelines_.divergence, nullptr);
       vkDestroyPipeline(device_, pipelines_.jacobi, nullptr);
       vkDestroyPipeline(device_, pipelines_.colorPass, nullptr);
-      vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.advection, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.boundary, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.jacobi, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.divergence, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.colorPass, nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.advection,
                                    nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.boundary,

@@ -16,27 +16,18 @@ layout (binding = 0) uniform UBO
 layout (binding = 1) uniform sampler2D field1;
 layout (binding = 2) uniform sampler2D field2;
 
+// generates a rand number [0, 1]
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
 void main() {
-	/* debug */
-	vec3 black = vec3(0.0);
-	vec3 red = vec3(1.0, 0., 0.);
-	vec3 green = vec3(0.0, 1., 0.);
-	vec3 blue = vec3(0., 0., 1.);
-	float x = gl_FragCoord.x - 0.5;
-	float y = gl_FragCoord.y - 0.5;
-
-	vec2 coords = gl_FragCoord.xy;
-
-	// boundary
-	if (x == 0 || x == ubo.viewportResolution.x - 1 || y == 0 || y == ubo.viewportResolution.y - 1) {
-		// Debugging: this color should never be rendered
-		outFragColor = vec4(blue, 1.0);
-		return; 
-	}
-	//outFragColor = vec4(green, 1.f);
+	// debug
+	// outFragColor.xyz = ((vec3(rand(gl_FragCoord.xy), rand(gl_FragCoord.xz), rand(gl_FragCoord.yz))) * 100) - 50;
 	// return;
 
 	// follow the velocity field "back in time"
+	vec2 coords = gl_FragCoord.xy;
 	vec2 pos = coords - ubo.timestep * texture(field1, coords).xy;
 	// interpolate and write to the output fragment
 	outFragColor = texture(field2, pos);
