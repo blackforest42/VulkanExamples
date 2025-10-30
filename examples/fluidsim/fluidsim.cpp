@@ -22,6 +22,7 @@ class VulkanExample : public VulkanExampleBase {
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 1;
   static constexpr float TIME_STEP{0.1f};
+  bool init_vector_field = true;
 
   struct AdvectionUBO {
     alignas(16) glm::vec3 randomVec3;
@@ -133,6 +134,7 @@ class VulkanExample : public VulkanExampleBase {
     VulkanExampleBase::prepare();
     prepareUniformBuffers();
     prepareOffscreen();
+    // generateRandomTexture();
     setupDescriptors();
     preparePipelines();
     prepared_ = true;
@@ -748,6 +750,27 @@ class VulkanExample : public VulkanExampleBase {
     VkCommandBufferBeginInfo cmdBufInfo =
         vks::initializers::commandBufferBeginInfo();
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
+
+    // init Randomize vector field
+    if (init_vector_field) {
+      // vks::Texture2D result;
+      // std::random_device rndDevice;
+      // std::default_random_engine rndEngine(benchmark.active ? 0 :
+      // rndDevice()); std::uniform_int_distribution<> rndDist(/*min*/ -100,
+      // /*max*/ 100); const size_t bufferSize = width_ * height_ * 4;
+      // std::vector<uint8_t> texture(bufferSize);
+      // for (size_t j = 0; j < width_ * height_; j++) {
+      //   texture[j * 4] = rndDist(rndEngine);
+      //   texture[j * 4 + 1] = rndDist(rndEngine);
+      //   texture[j * 4 + 2] = rndDist(rndEngine);
+      //   texture[j * 4 + 3] = 255;
+      // }
+      // result.fromBuffer(texture.data(), bufferSize,
+      //                   VK_FORMAT_R32G32B32A32_SFLOAT, width_, height_,
+      //                   vulkanDevice_, queue_, VK_FILTER_NEAREST);
+      // copyImage(cmdBuffer, result.image, velocity_field_[0].color.image);
+      // init_vector_field = false;
+    }
 
     // Advection
     velocityBoundaryCmd(cmdBuffer);

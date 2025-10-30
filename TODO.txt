@@ -1,6 +1,6 @@
 Oct 27
-	- start gradient pipelines
-	- start force/impulse pipelines
+	- start force/impulse pipeline
+	- tried creating a random generated vector field, causes crash fixed by restart
 
 
 ### Fluid sim
