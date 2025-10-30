@@ -22,7 +22,7 @@ float gaussian(vec2 pos, float radius) {
 }
 
 void main() {
-	vec2 delta_distance = inUV - ubo.epicenter / ubo.viewportResolution;
-	float rad = ubo.viewportResolution.x * ubo.radius;
+	vec2 delta_distance = inUV - ubo.epicenter;
+	float rad = ubo.radius;
 	outFragColor = texture(velocityField, inUV) + ubo.color.xyzz * gaussian(delta_distance, rad);
 }

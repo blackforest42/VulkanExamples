@@ -13,15 +13,21 @@ layout (binding = 1) uniform sampler2D pressureFieldTex;
 
 // takes an un-normalized vec2 and converts to normalized [0 - 1] vec3
 vec2 vector2color(vec2 vector) {
+	float norm = length(vector);
 	vector = normalize(vector);
 	vec2 result = (vector + vec2(1.0)) / 2.f;
-	return result;
+	return result * norm;
 }
 
 void main() {
-	vec4 texel = texture(velocityFieldTex, inUV);
-	vec2 normalized_rgb = vector2color(texel.xy);
-	outFragColor = vec4(0, 0, 0, 1);
-	// Preference: drop the 'red' channel, keep green and blue
-	outFragColor.rgb = vec3(0.0f, normalized_rgb);
+	vec3 texel = texture(velocityFieldTex, inUV).rgb;
+	if (texel.x > 0 || texel.y > 0) {
+		debugPrintfEXT("Negative vector: %1.2v3f", texel);
+	}
+
+	// tone map the texel
+	vec3 mapped = vec3(1.0) - exp(-texel * 1.0f);
+
+	// drop 'blue' channel from result
+	outFragColor = vec4(mapped, 1.f);
 }

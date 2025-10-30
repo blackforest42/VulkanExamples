@@ -21,8 +21,8 @@ class VulkanExample : public VulkanExampleBase {
   const uint32_t JACOBI_ITERATIONS = 80;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 1;
-  static constexpr float TIME_STEP{0.1f};
-  std::array<float, 4> impulseColor{};
+  static constexpr float TIME_STEP{.01f};
+  std::array<float, 4> impulseColor{1, 1, 0};
 
   struct AdvectionUBO {
     alignas(16) glm::vec3 randomVec3;
@@ -36,10 +36,10 @@ class VulkanExample : public VulkanExampleBase {
   };
 
   struct ImpulseUBO {
-    alignas(16) glm::vec3 color{1, 0, 0};
-    alignas(8) glm::vec2 epicenter{};
+    alignas(16) glm::vec3 color{};
+    alignas(8) glm::vec2 epicenter{0.5, 0.5};
     alignas(8) glm::vec2 bufferResolution{};
-    alignas(4) float radius{0.1f};
+    alignas(4) float radius{0.001f};
   };
 
   struct JacobiUBO {
@@ -53,24 +53,25 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     AdvectionUBO advection;
+    ImpulseUBO impulse;
     BoundaryUBO boundary;
     JacobiUBO jacobi;
     DivergenceUBO divergence;
-    ImpulseUBO impulse;
   } ubos_;
 
   struct UniformBuffers {
     vks::Buffer advection;
+    vks::Buffer impulse;
     vks::Buffer boundary;
     vks::Buffer jacobi;
     vks::Buffer divergence;
-    vks::Buffer impulse;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
 
   struct {
     VkDescriptorSetLayout advection;
     VkDescriptorSetLayout boundary;
+    VkDescriptorSetLayout impulse;
     VkDescriptorSetLayout jacobi;
     VkDescriptorSetLayout divergence;
     VkDescriptorSetLayout gradient;
@@ -79,6 +80,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct DescriptorSets {
     VkDescriptorSet advection;
+    VkDescriptorSet impulse;
     VkDescriptorSet boundaryVelocity;
     VkDescriptorSet boundaryPressure;
     VkDescriptorSet jacobiVelocity;
@@ -91,6 +93,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     VkPipelineLayout advection;
+    VkPipelineLayout impulse;
     VkPipelineLayout boundary;
     VkPipelineLayout jacobi;
     VkPipelineLayout divergence;
@@ -100,6 +103,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     VkPipeline advection;
+    VkPipeline impulse;
     VkPipeline boundary;
     VkPipeline jacobi;
     VkPipeline divergence;
@@ -311,7 +315,7 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(
             poolSizes,
-            /* max number of descriptor sets that can be allocated at once*/ 8 *
+            /* max number of descriptor sets that can be allocated at once*/ 9 *
                 MAX_CONCURRENT_FRAMES);
     VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
                                            nullptr, &descriptorPool_));
@@ -342,6 +346,23 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.advection));
 
+    // Layout: Impulse
+    setLayoutBindings = {
+        // Binding 0 : Fragment shader
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),
+        // Binding 1 : Fragment shader field texture 1
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 1)};
+    descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(
+        setLayoutBindings.data(),
+        static_cast<uint32_t>(setLayoutBindings.size()));
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.impulse));
     // Layout: Boundary
     setLayoutBindings = {
         // Binding 0 : Fragment shader
@@ -443,6 +464,7 @@ class VulkanExample : public VulkanExampleBase {
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.colorPass));
 
+    // Descriptor Sets
     for (auto i = 0; i < uniformBuffers_.size(); i++) {
       // Advection
       VkDescriptorSetAllocateInfo allocInfo =
@@ -462,6 +484,24 @@ class VulkanExample : public VulkanExampleBase {
               descriptorSets_[i].advection,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 2, &velocity_field_[0].descriptor),
+      };
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
+
+      // Impulse
+      allocInfo = vks::initializers::descriptorSetAllocateInfo(
+          descriptorPool_, &descriptorSetLayouts_.impulse, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].impulse));
+      writeDescriptorSets = {
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].impulse, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].impulse.descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].impulse,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              /*binding id*/ 1, &velocity_field_[0].descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -617,6 +657,11 @@ class VulkanExample : public VulkanExampleBase {
                                            &pipelineLayouts_.advection));
 
     pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.impulse, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.impulse));
+
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
         &descriptorSetLayouts_.boundary, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.boundary));
@@ -695,6 +740,13 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelineCI, nullptr,
                                               &pipelines_.advection));
 
+    // Impulse Pipeline
+    pipelineCI.layout = pipelineLayouts_.impulse;
+    shaderStages[1] = loadShader(getShadersPath() + "fluidsim/impulse.frag.spv",
+                                 VK_SHADER_STAGE_FRAGMENT_BIT);
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.impulse));
+
     // Boundary pipeline
     pipelineCI.layout = pipelineLayouts_.boundary;
     shaderStages[1] =
@@ -769,7 +821,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void OnUpdateUIOverlay(vks::UIOverlay* overlay) override {
     if (overlay->header("Settings")) {
-      overlay->sliderFloat("Impulse Radius", &ubos_.impulse.radius, 0.0, 1.0);
+      overlay->sliderFloat("Impulse Radius", &ubos_.impulse.radius, 0.0, 0.1);
       overlay->colorPicker("Impulse Color/Vector", impulseColor.data());
     }
   }
@@ -789,6 +841,9 @@ class VulkanExample : public VulkanExampleBase {
               velocity_field_[0].color.image);
 
     // Impulse
+    impulseCmd(cmdBuffer);
+    copyImage(cmdBuffer, velocity_field_[1].color.image,
+              velocity_field_[0].color.image);
 
     // Jacobi: Viscous Diffusion
     for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
@@ -823,7 +878,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void advectionCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {1.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -867,6 +922,54 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
 
+    vkCmdEndRenderPass(cmdBuffer);
+  }
+
+  void impulseCmd(VkCommandBuffer& cmdBuffer) {
+    VkClearValue clearValues{};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+
+    VkRenderPassBeginInfo renderPassBeginInfo =
+        vks::initializers::renderPassBeginInfo();
+    renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+    renderPassBeginInfo.framebuffer = velocity_field_[1].framebuffer;
+    renderPassBeginInfo.renderArea.offset.x = 0;
+    renderPassBeginInfo.renderArea.offset.y = 0;
+    renderPassBeginInfo.renderArea.extent.width = width_;
+    renderPassBeginInfo.renderArea.extent.height = height_;
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValues;
+
+    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport =
+        vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.impulse, 0,
+        1, &descriptorSets_[currentBuffer_].impulse, 0, nullptr);
+
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipelines_.impulse);
+    vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+    // IMPORTANT: This barrier is to serialize WRITES BEFORE READS
+    {
+      VkMemoryBarrier memBarrier = {};
+      memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+      memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
+                           nullptr, 0, nullptr);
+    }
     vkCmdEndRenderPass(cmdBuffer);
   }
 
@@ -1083,7 +1186,6 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.gradient);
     vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
-    drawUI(cmdBuffer);
     vkCmdEndRenderPass(cmdBuffer);
   }
 
