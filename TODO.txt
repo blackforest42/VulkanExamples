@@ -1,6 +1,10 @@
 Oct 27
-	- start force/impulse pipeline
-	- tried creating a random generated vector field, causes crash fixed by restart
+- added impulse
+- nothing looks "correct" lots of noise in velocity field when jacobi iter > 0
+	- jacobi <= 11, X's
+	- jacobi > 11, dippin dots
+- try adding "ink density"
+- add a toggle in imgui to switch views between multiple texture maps
 
 
 ### Fluid sim

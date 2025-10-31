@@ -43,6 +43,7 @@ vec3 vector2color(vec2 vector) {
 
 void main() {
 	vec3 texel = texture(velocityFieldTex, inUV).rgb;
+	// vec3 texel = texture(pressureFieldTex, inUV).rgb;
 	// if (texel.x < 0 && texel.y < 0) {
 	//	debugPrintfEXT("Negative vector: %1.2v3f", texel);
 	// }

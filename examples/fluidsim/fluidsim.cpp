@@ -18,10 +18,10 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  const uint32_t JACOBI_ITERATIONS = 25;
+  const uint32_t JACOBI_ITERATIONS = 12;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 1;
-  static constexpr float TIME_STEP{0.01};
+  static constexpr float TIME_STEP{.0001};
   bool addImpulse = false;
 
   struct AdvectionUBO {
@@ -1216,6 +1216,19 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.gradient);
     vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+    // IMPORTANT: This barrier is to serialize WRITES BEFORE READS
+    {
+      VkMemoryBarrier memBarrier = {};
+      memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+      memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
+                           nullptr, 0, nullptr);
+    }
     vkCmdEndRenderPass(cmdBuffer);
   }
 
