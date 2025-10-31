@@ -23,6 +23,8 @@ void main() {
 	float height = ubo.bufferResolution.y;
 
 	vec2 dudv = 1 / ubo.bufferResolution;
+	float du = dudv.x;
+	float dv = dudv.y;
 
 	outFragColor = texture(field1, inUV);
 
@@ -42,19 +44,19 @@ void main() {
 
 	// boundaries
 	if (x == 0) {
-		outFragColor = ubo.scale * texture(field1, inUV + vec2(dudv.x, 0));
+		outFragColor = ubo.scale * texture(field1, inUV + vec2(du, 0));
 		return;
 	}
 	else if (x == ubo.bufferResolution.x - 1) {
-		outFragColor = ubo.scale * texture(field1, inUV + vec2(-dudv.x, 0));
+		outFragColor = ubo.scale * texture(field1, inUV - vec2(du, 0));
 		return;
 	}
 	else if (y == 0) {
-		outFragColor = ubo.scale * texture(field1, inUV + vec2(0, dudv.y));
+		outFragColor = ubo.scale * texture(field1, inUV + vec2(0, dv));
 		return;
 	}
 	else if (y == ubo.bufferResolution.y - 1) {
-		outFragColor = ubo.scale * texture(field1, inUV + vec2(0, -dudv.y));
+		outFragColor = ubo.scale * texture(field1, inUV - vec2(0, dv));
 		return;
 	}
 	return; 

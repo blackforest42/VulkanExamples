@@ -7,19 +7,27 @@ layout (location = 0) in vec2 inUV;
 // out
 layout (location = 0) out vec4 outFragColor;
 
-layout (binding = 0) uniform sampler2D velocityFieldTex;
-layout (binding = 1) uniform sampler2D pressureFieldTex;
+layout (binding = 0) uniform UBO
+{
+    vec2 bufferResolution;
+} ubo;
+
+layout (binding = 1) uniform sampler2D velocityFieldTex;
+layout (binding = 2) uniform sampler2D pressureFieldTex;
 
 void main() {
+	vec2 dudv = 1 / ubo.bufferResolution;
+	float du = dudv.x;
+	float dv = dudv.y;
+
 	// Take the gradient of the scalar valued pressure field
 	// Note: we only take the 'x' component since pressure field
 	// is scalar valued and uniform.
-	float pL = texture(pressureFieldTex, inUV - vec2(1, 0)).x;
-	float pR = texture(pressureFieldTex, inUV + vec2(1, 0)).x;
-	float pB = texture(pressureFieldTex, inUV - vec2(0, 1)).x;
-	float pT = texture(pressureFieldTex, inUV + vec2(0, 1)).x;
+	float pL = texture(pressureFieldTex, inUV - vec2(du, 0)).x;
+	float pR = texture(pressureFieldTex, inUV + vec2(du, 0)).x;
+	float pB = texture(pressureFieldTex, inUV - vec2(0, dv)).x;
+	float pT = texture(pressureFieldTex, inUV + vec2(0, dv)).x;
 
-	// Set output to the velocity field
 	outFragColor = texture(velocityFieldTex, inUV);
 	// Subtract the pressure gradient from velocity
 	outFragColor.xy -= 0.5f * vec2(pR - pL, pT - pB);

@@ -18,21 +18,19 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  const uint32_t JACOBI_ITERATIONS = 1;
+  const uint32_t JACOBI_ITERATIONS = 25;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 1;
-  static constexpr float TIME_STEP{.0001f};
+  static constexpr float TIME_STEP{0.01};
   bool addImpulse = false;
 
   struct AdvectionUBO {
-    alignas(16) glm::vec3 randomVec3;
-    alignas(8) glm::vec2 bufferResolution{};
     alignas(4) float timestep{TIME_STEP};
   };
 
   struct BoundaryUBO {
-    glm::vec2 bufferResolution{};
-    float scale{1.f};
+    alignas(8) glm::vec2 bufferResolution{};
+    alignas(4) float scale{};
   };
 
   struct ImpulseUBO {
@@ -42,12 +40,18 @@ class VulkanExample : public VulkanExampleBase {
   };
 
   struct JacobiUBO {
-    float alpha{1.f};
-    float beta{0.25f};
+    alignas(8) glm::vec2 bufferResolution{};
+    alignas(4) float alpha{};
+    alignas(4) float beta{};
   };
 
   struct DivergenceUBO {
-    float halfRdx{0.5f};
+    alignas(8) glm::vec2 bufferResolution{};
+    alignas(4) float halfRdx{0.5f};
+  };
+
+  struct GradientUBO {
+    alignas(8) glm::vec2 bufferResolution{};
   };
 
   struct {
@@ -56,6 +60,7 @@ class VulkanExample : public VulkanExampleBase {
     BoundaryUBO boundary;
     JacobiUBO jacobi;
     DivergenceUBO divergence;
+    GradientUBO gradient;
   } ubos_;
 
   struct UniformBuffers {
@@ -64,6 +69,7 @@ class VulkanExample : public VulkanExampleBase {
     vks::Buffer boundary;
     vks::Buffer jacobi;
     vks::Buffer divergence;
+    vks::Buffer gradient;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
 
@@ -184,6 +190,14 @@ class VulkanExample : public VulkanExampleBase {
               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
           &buffer.divergence, sizeof(DivergenceUBO), &ubos_.divergence));
       VK_CHECK_RESULT(buffer.divergence.map());
+
+      // Gradient
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.gradient, sizeof(GradientUBO), &ubos_.gradient));
+      VK_CHECK_RESULT(buffer.gradient.map());
 
       // Impulse
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
@@ -425,16 +439,20 @@ class VulkanExample : public VulkanExampleBase {
 
     // Layout: Gradient
     setLayoutBindings = {
-        // Binding 0 : velocity field
+        // Binding 0 : Uniform
         vks::initializers::descriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 0),
-        // Binding 1 : pressure field
+        // Binding 1 : velocity field
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 1),
+        // Binding 2 : pressure field
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 2),
     };
     descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(
         setLayoutBindings.data(),
@@ -615,13 +633,16 @@ class VulkanExample : public VulkanExampleBase {
                                                &descriptorSets_[i].gradient));
       writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].gradient,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              /*binding id*/ 0, &velocity_field_[0].descriptor),
+              descriptorSets_[i].divergence, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].gradient.descriptor),
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].gradient,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              /*binding id*/ 1, &pressure_field_[0].descriptor),
+              /*binding id*/ 1, &velocity_field_[0].descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].gradient,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              /*binding id*/ 2, &pressure_field_[0].descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -802,14 +823,24 @@ class VulkanExample : public VulkanExampleBase {
 
   // B.1
   void updateUniformBuffers() {
-    ubos_.advection.bufferResolution = glm::vec2(width_, height_);
-    ubos_.advection.randomVec3 = glm::vec3();
     memcpy(uniformBuffers_[currentBuffer_].advection.mapped, &ubos_.advection,
            sizeof(AdvectionUBO));
 
     ubos_.boundary.bufferResolution = glm::vec2(width_, height_);
     memcpy(uniformBuffers_[currentBuffer_].boundary.mapped, &ubos_.boundary,
            sizeof(BoundaryUBO));
+
+    ubos_.jacobi.bufferResolution = glm::vec2(width_, height_);
+    memcpy(uniformBuffers_[currentBuffer_].jacobi.mapped, &ubos_.jacobi,
+           sizeof(JacobiUBO));
+
+    ubos_.gradient.bufferResolution = glm::vec2(width_, height_);
+    memcpy(uniformBuffers_[currentBuffer_].gradient.mapped, &ubos_.gradient,
+           sizeof(GradientUBO));
+
+    ubos_.divergence.bufferResolution = glm::vec2(width_, height_);
+    memcpy(uniformBuffers_[currentBuffer_].divergence.mapped, &ubos_.divergence,
+           sizeof(DivergenceUBO));
 
     ubos_.impulse.bufferResolution = glm::vec2(width_, height_);
     memcpy(uniformBuffers_[currentBuffer_].impulse.mapped, &ubos_.impulse,
