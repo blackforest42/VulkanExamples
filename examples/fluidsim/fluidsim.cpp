@@ -23,6 +23,9 @@ class VulkanExample : public VulkanExampleBase {
   const uint32_t SLAB_OFFSET = 10;
   static constexpr float TIME_STEP{.01};
   bool addImpulse = false;
+  bool shouldInitColorField_ = true;
+
+  struct ColorInitUBO {};
 
   struct AdvectionUBO {
     alignas(4) float timestep{TIME_STEP};
@@ -55,6 +58,7 @@ class VulkanExample : public VulkanExampleBase {
   };
 
   struct {
+    ColorInitUBO colorInit;
     AdvectionUBO advection;
     ImpulseUBO impulse;
     BoundaryUBO boundary;
@@ -64,6 +68,7 @@ class VulkanExample : public VulkanExampleBase {
   } ubos_;
 
   struct UniformBuffers {
+    vks::Buffer colorInit;
     vks::Buffer advection;
     vks::Buffer impulse;
     vks::Buffer boundary;
@@ -74,6 +79,7 @@ class VulkanExample : public VulkanExampleBase {
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_{};
 
   struct {
+    VkDescriptorSetLayout colorInit;
     VkDescriptorSetLayout advection;
     VkDescriptorSetLayout boundary;
     VkDescriptorSetLayout impulse;
@@ -84,6 +90,7 @@ class VulkanExample : public VulkanExampleBase {
   } descriptorSetLayouts_{};
 
   struct DescriptorSets {
+    VkDescriptorSet colorInit;
     VkDescriptorSet advection;
     VkDescriptorSet impulse;
     VkDescriptorSet boundaryVelocity;
@@ -97,6 +104,7 @@ class VulkanExample : public VulkanExampleBase {
   std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_{};
 
   struct {
+    VkPipelineLayout colorInit;
     VkPipelineLayout advection;
     VkPipelineLayout impulse;
     VkPipelineLayout boundary;
@@ -107,6 +115,7 @@ class VulkanExample : public VulkanExampleBase {
   } pipelineLayouts_{};
 
   struct {
+    VkPipeline colorInit;
     VkPipeline advection;
     VkPipeline impulse;
     VkPipeline boundary;
@@ -132,10 +141,13 @@ class VulkanExample : public VulkanExampleBase {
     VkSampler sampler{};
   } offscreenPass_;
 
+  // Scalar valued color maps
+  std::array<FrameBuffer, 2> color_field_{};
   // 2 framebuffers for each field, index 0 is for reading, 1 is for writing
   // This is for Jacobi iterations
   std::array<FrameBuffer, 2> velocity_field_{};
   std::array<FrameBuffer, 2> pressure_field_{};
+  // Scalar valued
   FrameBuffer divergence_field_{};
 
   VulkanExample() {
@@ -159,6 +171,14 @@ class VulkanExample : public VulkanExampleBase {
 
   void prepareUniformBuffers() {
     for (auto& buffer : uniformBuffers_) {
+      // Color Init
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.colorInit, sizeof(ColorInitUBO), &ubos_.colorInit));
+      VK_CHECK_RESULT(buffer.colorInit.map());
+
       // Advection
       VK_CHECK_RESULT(vulkanDevice_->createBuffer(
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -295,6 +315,13 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(
         vkCreateSampler(device_, &sampler, nullptr, &offscreenPass_.sampler));
 
+    // Color field
+    for (auto& fb : color_field_) {
+      fb.width = width_;
+      fb.height = height_;
+      prepareOffscreenFramebuffer(&fb, FB_COLOR_FORMAT);
+    }
+
     // Velocity field
     for (auto& fb : velocity_field_) {
       fb.width = width_;
@@ -328,13 +355,28 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(
             poolSizes,
-            /* max number of descriptor sets that can be allocated at once*/ 9 *
-                MAX_CONCURRENT_FRAMES);
+            /* max number of descriptor sets that can be allocated at once*/
+            10 * MAX_CONCURRENT_FRAMES);
     VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
                                            nullptr, &descriptorPool_));
+    // Layout: Color init
+    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+        // Binding 0 : Fragment shader
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 0),
+    };
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI =
+        vks::initializers::descriptorSetLayoutCreateInfo(
+            setLayoutBindings.data(),
+            static_cast<uint32_t>(setLayoutBindings.size()));
+    VK_CHECK_RESULT(
+        vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
+                                    &descriptorSetLayouts_.colorInit));
 
     // Layout: Advection
-    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
+    setLayoutBindings = {
         // Binding 0 : Fragment shader
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -351,10 +393,9 @@ class VulkanExample : public VulkanExampleBase {
             /*binding id*/ 2),
     };
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI =
-        vks::initializers::descriptorSetLayoutCreateInfo(
-            setLayoutBindings.data(),
-            static_cast<uint32_t>(setLayoutBindings.size()));
+    descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(
+        setLayoutBindings.data(),
+        static_cast<uint32_t>(setLayoutBindings.size()));
     VK_CHECK_RESULT(
         vkCreateDescriptorSetLayout(device_, &descriptorSetLayoutCI, nullptr,
                                     &descriptorSetLayouts_.advection));
@@ -483,13 +524,27 @@ class VulkanExample : public VulkanExampleBase {
 
     // Descriptor Sets
     for (auto i = 0; i < uniformBuffers_.size(); i++) {
-      // Advection
+      // Color Init
       VkDescriptorSetAllocateInfo allocInfo =
           vks::initializers::descriptorSetAllocateInfo(
-              descriptorPool_, &descriptorSetLayouts_.advection, 1);
+              descriptorPool_, &descriptorSetLayouts_.colorInit, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].colorInit));
+      std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].colorInit, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              /*binding id*/ 0, &uniformBuffers_[i].colorInit.descriptor),
+      };
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
+
+      // Advection
+      allocInfo = vks::initializers::descriptorSetAllocateInfo(
+          descriptorPool_, &descriptorSetLayouts_.advection, 1);
       VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
                                                &descriptorSets_[i].advection));
-      std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+      writeDescriptorSets = {
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].advection, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
               /*binding id*/ 0, &uniformBuffers_[i].advection.descriptor),
@@ -498,9 +553,9 @@ class VulkanExample : public VulkanExampleBase {
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 1, &velocity_field_[0].descriptor),
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].advection,
+              descriptorSets_[i].colorInit,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              /*binding id*/ 2, &velocity_field_[0].descriptor),
+              /*binding id*/ 2, &color_field_[0].descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -672,7 +727,12 @@ class VulkanExample : public VulkanExampleBase {
   void preparePipelines() {
     VkPipelineLayoutCreateInfo pipelineLayoutCI =
         vks::initializers::pipelineLayoutCreateInfo(
-            &descriptorSetLayouts_.advection, 1);
+            &descriptorSetLayouts_.colorInit, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
+                                           &pipelineLayouts_.colorInit));
+
+    pipelineLayoutCI = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.advection, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCI, nullptr,
                                            &pipelineLayouts_.advection));
 
@@ -760,6 +820,24 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelineCI, nullptr,
                                               &pipelines_.advection));
 
+    // Color init Pipeline
+    pipelineCI.layout = pipelineLayouts_.colorInit;
+    shaderStages[1] =
+        loadShader(getShadersPath() + "fluidsim/colorinit.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.colorInit));
+
+    // Boundary pipeline
+    pipelineCI.layout = pipelineLayouts_.boundary;
+    shaderStages[1] =
+        loadShader(getShadersPath() + "fluidsim/boundary.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                              &pipelineCI, nullptr,
+                                              &pipelines_.boundary));
+
     // Impulse Pipeline
     pipelineCI.layout = pipelineLayouts_.impulse;
     shaderStages[1] = loadShader(getShadersPath() + "fluidsim/impulse.frag.spv",
@@ -823,6 +901,9 @@ class VulkanExample : public VulkanExampleBase {
 
   // B.1
   void updateUniformBuffers() {
+    memcpy(uniformBuffers_[currentBuffer_].colorInit.mapped, &ubos_.colorInit,
+           sizeof(ColorInitUBO));
+
     memcpy(uniformBuffers_[currentBuffer_].advection.mapped, &ubos_.advection,
            sizeof(AdvectionUBO));
 
@@ -861,6 +942,11 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::commandBufferBeginInfo();
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
 
+    if (shouldInitColorField_) {
+      initColorCmd(cmdBuffer);
+      shouldInitColorField_ = false;
+    }
+
     // Advection
     velocityBoundaryCmd(cmdBuffer);
     advectionCmd(cmdBuffer);
@@ -874,14 +960,6 @@ class VulkanExample : public VulkanExampleBase {
                 velocity_field_[0].color.image);
       addImpulse = false;
     }
-
-    // Jacobi: Viscous Diffusion
-    // for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-    //  velocityBoundaryCmd(cmdBuffer);
-    //  velocityJacobiCmd(cmdBuffer);
-    //  copyImage(cmdBuffer, velocity_field_[1].color.image,
-    //            velocity_field_[0].color.image);
-    //}
 
     // Divergence
     divergenceCmd(cmdBuffer);
@@ -904,6 +982,55 @@ class VulkanExample : public VulkanExampleBase {
     colorPassCmd(cmdBuffer);
 
     VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
+  }
+
+  void initColorCmd(VkCommandBuffer& cmdBuffer) {
+    VkClearValue clearValues{};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+
+    VkRenderPassBeginInfo renderPassBeginInfo =
+        vks::initializers::renderPassBeginInfo();
+    renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
+    renderPassBeginInfo.framebuffer = color_field_[currentBuffer_].framebuffer;
+    renderPassBeginInfo.renderArea.offset.x = 0;
+    renderPassBeginInfo.renderArea.offset.y = 0;
+    renderPassBeginInfo.renderArea.extent.width = width_;
+    renderPassBeginInfo.renderArea.extent.height = height_;
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValues;
+
+    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport =
+        vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.colorInit,
+        0, 1, &descriptorSets_[currentBuffer_].colorInit, 0, nullptr);
+
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipelines_.colorInit);
+    vkCmdDraw(cmdBuffer, 6, 1, 0, 0);
+
+    // IMPORTANT: This barrier is to serialize WRITES BEFORE READS
+    {
+      VkMemoryBarrier memBarrier = {};
+      memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+      memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
+                           nullptr, 0, nullptr);
+    }
+
+    vkCmdEndRenderPass(cmdBuffer);
   }
 
   void advectionCmd(VkCommandBuffer& cmdBuffer) {
@@ -1302,6 +1429,9 @@ class VulkanExample : public VulkanExampleBase {
 
   void destroyOffscreenPass() {
     vkDestroyRenderPass(device_, offscreenPass_.renderPass, nullptr);
+    for (FrameBuffer fb : color_field_) {
+      vkDestroyFramebuffer(device_, fb.framebuffer, nullptr);
+    }
     for (FrameBuffer fb : velocity_field_) {
       vkDestroyFramebuffer(device_, fb.framebuffer, nullptr);
     }
@@ -1389,16 +1519,20 @@ class VulkanExample : public VulkanExampleBase {
 
   ~VulkanExample() {
     if (device_) {
+      vkDestroyPipeline(device_, pipelines_.colorInit, nullptr);
       vkDestroyPipeline(device_, pipelines_.advection, nullptr);
       vkDestroyPipeline(device_, pipelines_.boundary, nullptr);
       vkDestroyPipeline(device_, pipelines_.divergence, nullptr);
       vkDestroyPipeline(device_, pipelines_.jacobi, nullptr);
       vkDestroyPipeline(device_, pipelines_.colorPass, nullptr);
+      vkDestroyPipelineLayout(device_, pipelineLayouts_.colorInit, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.advection, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.boundary, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.jacobi, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.divergence, nullptr);
       vkDestroyPipelineLayout(device_, pipelineLayouts_.colorPass, nullptr);
+      vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.colorInit,
+                                   nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.advection,
                                    nullptr);
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.boundary,
@@ -1410,6 +1544,7 @@ class VulkanExample : public VulkanExampleBase {
       vkDestroyDescriptorSetLayout(device_, descriptorSetLayouts_.colorPass,
                                    nullptr);
       for (auto& buffer : uniformBuffers_) {
+        buffer.colorInit.destroy();
         buffer.advection.destroy();
         buffer.boundary.destroy();
         buffer.divergence.destroy();

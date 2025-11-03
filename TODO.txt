@@ -1,5 +1,5 @@
 Oct 31
-- try adding "ink density"
+- add a color map
 - add a toggle in imgui to switch views between multiple texture maps
 - tested fluid-sim.js on webGPU, jacboi iter with velocity field is wrong
 

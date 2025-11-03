@@ -12,8 +12,8 @@ layout (binding = 0) uniform UBO
 	float timestep;
 } ubo;
 
-layout (binding = 1) uniform sampler2D field1;
-layout (binding = 2) uniform sampler2D field2;
+layout (binding = 1) uniform sampler2D field1; // velocity field
+layout (binding = 2) uniform sampler2D field2; // color field
 
 void main() {
 	// follow the velocity field "back in time"
