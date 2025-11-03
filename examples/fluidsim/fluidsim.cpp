@@ -18,10 +18,10 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  const uint32_t JACOBI_ITERATIONS = 80;
+  const uint32_t JACOBI_ITERATIONS = 50;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 10;
-  static constexpr float TIME_STEP{.01};
+  static constexpr float TIME_STEP{.1};
   bool addImpulse = false;
   bool shouldInitColorField_ = true;
   std::vector<std::string> texture_viewer_selection = {"color", "velocity",
