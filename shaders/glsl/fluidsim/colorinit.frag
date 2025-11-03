@@ -13,5 +13,17 @@ layout (binding = 0) uniform UBO
 } ubo;
 
 void main() {
-	outFragColor = vec4(1.f);
+
+	float x = gl_FragCoord.x;
+	float y = gl_FragCoord.y;
+
+	x = floor(x / 20.f);
+	y = floor(y / 20.f);
+
+	if (mod(x + y, 2) == 0) {
+		outFragColor.rgb = vec3(1.f);
+	} else {
+		outFragColor.rgb = vec3(0.f);
+	}
+	return;
 }

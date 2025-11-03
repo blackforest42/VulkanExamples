@@ -25,7 +25,9 @@ class VulkanExample : public VulkanExampleBase {
   bool addImpulse = false;
   bool shouldInitColorField_ = true;
 
-  struct ColorInitUBO {};
+  struct ColorInitUBO {
+    alignas(8) glm::vec2 bufferResolution{};
+  };
 
   struct AdvectionUBO {
     alignas(4) float timestep{TIME_STEP};
@@ -351,7 +353,7 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::descriptorPoolSize(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             /* descriptorCount */ MAX_CONCURRENT_FRAMES *
-                /*max number of textures*/ 2)};
+                /*max number of textures*/ 3)};
     VkDescriptorPoolCreateInfo descriptorPoolInfo =
         vks::initializers::descriptorPoolCreateInfo(
             poolSizes,
@@ -361,7 +363,7 @@ class VulkanExample : public VulkanExampleBase {
                                            nullptr, &descriptorPool_));
     // Layout: Color init
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
-        // Binding 0 : Fragment shader
+        // Binding 0 : uniform buffer
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 0),
@@ -514,6 +516,11 @@ class VulkanExample : public VulkanExampleBase {
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VK_SHADER_STAGE_FRAGMENT_BIT,
             /*binding id*/ 1),
+        // Binding 1 : color field
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            /*binding id*/ 2),
     };
     descriptorSetLayoutCI = vks::initializers::descriptorSetLayoutCreateInfo(
         setLayoutBindings.data(),
@@ -553,7 +560,7 @@ class VulkanExample : public VulkanExampleBase {
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 1, &velocity_field_[0].descriptor),
           vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].colorInit,
+              descriptorSets_[i].advection,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 2, &color_field_[0].descriptor),
       };
@@ -717,6 +724,10 @@ class VulkanExample : public VulkanExampleBase {
               descriptorSets_[i].colorPass,
               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
               /*binding id*/ 1, &pressure_field_[0].descriptor),
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].colorPass,
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              /*binding id*/ 2, &color_field_[0].descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -901,6 +912,7 @@ class VulkanExample : public VulkanExampleBase {
 
   // B.1
   void updateUniformBuffers() {
+    ubos_.colorInit.bufferResolution = glm::vec2(width_, height_);
     memcpy(uniformBuffers_[currentBuffer_].colorInit.mapped, &ubos_.colorInit,
            sizeof(ColorInitUBO));
 
@@ -944,6 +956,8 @@ class VulkanExample : public VulkanExampleBase {
 
     if (shouldInitColorField_) {
       initColorCmd(cmdBuffer);
+      copyImage(cmdBuffer, color_field_[1].color.image,
+                color_field_[0].color.image);
       shouldInitColorField_ = false;
     }
 
@@ -986,12 +1000,12 @@ class VulkanExample : public VulkanExampleBase {
 
   void initColorCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 1.0f, 0.0f, 1.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
     renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
-    renderPassBeginInfo.framebuffer = color_field_[currentBuffer_].framebuffer;
+    renderPassBeginInfo.framebuffer = color_field_[1].framebuffer;
     renderPassBeginInfo.renderArea.offset.x = 0;
     renderPassBeginInfo.renderArea.offset.y = 0;
     renderPassBeginInfo.renderArea.extent.width = width_;
@@ -1424,6 +1438,7 @@ class VulkanExample : public VulkanExampleBase {
     prepareOffscreen();
     vkResetDescriptorPool(device_, descriptorPool_, 0);
     setupDescriptors();
+    shouldInitColorField_ = true;
     resized_ = false;
   }
 

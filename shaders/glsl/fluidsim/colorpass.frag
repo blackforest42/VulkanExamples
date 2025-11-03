@@ -10,6 +10,7 @@ layout (location = 0) out vec4 outFragColor;
 
 layout (binding = 0) uniform sampler2D velocityFieldTex;
 layout (binding = 1) uniform sampler2D pressureFieldTex;
+layout (binding = 2) uniform sampler2D colorFieldTex;
 
 const float PI = 3.14159265358979323846;
 
@@ -42,14 +43,14 @@ vec3 vector2color(vec2 vector) {
 }
 
 void main() {
-	vec3 texel = texture(velocityFieldTex, inUV).rgb;
-	// vec3 texel = texture(pressureFieldTex, inUV).rgb;
-	// if (texel.x < 0 && texel.y < 0) {
-	//	debugPrintfEXT("Negative vector: %1.2v3f", texel);
-	// }
+	vec3 texel = texture(colorFieldTex, inUV).rgb;
+	outFragColor = vec4(texel, 1.f);
+	return;
 
-	vec3 normalized = vector2color(texel.xy);
+	vec3 result;
+
+	result = vector2color(texel.xy);
 
 	// drop 'blue' channel from result
-	outFragColor = vec4(normalized, 1.f);
+	outFragColor = vec4(result, 1.f);
 }
