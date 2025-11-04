@@ -18,10 +18,10 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  const uint32_t JACOBI_ITERATIONS = 80;
+  const uint32_t JACOBI_ITERATIONS = 100;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 10;
-  static constexpr float TIME_STEP{.1};
+  static constexpr float TIME_STEP{1.f / 60};
   bool addImpulse = false;
   bool shouldInitColorField_ = true;
   std::vector<std::string> texture_viewer_selection = {"color", "velocity",
@@ -152,14 +152,11 @@ class VulkanExample : public VulkanExampleBase {
     VkSampler sampler{};
   } offscreenPass_;
 
-  // Scalar valued color maps
-  std::array<FrameBuffer, 2> color_field_{};
   // 2 framebuffers for each field, index 0 is for reading, 1 is for writing
-  // This is for Jacobi iterations
+  std::array<FrameBuffer, 2> color_field_{};  // Scalar valued color map
   std::array<FrameBuffer, 2> velocity_field_{};
   std::array<FrameBuffer, 2> pressure_field_{};
-  // Scalar valued
-  FrameBuffer divergence_field_{};
+  FrameBuffer divergence_field_{};  // Scalar valued
 
   VulkanExample() {
     title = "Blackhole";
@@ -1059,7 +1056,7 @@ class VulkanExample : public VulkanExampleBase {
 
     // Gradient subtraction
     velocityBoundaryCmd(cmdBuffer);
-    gradientCmd(cmdBuffer);
+    gradientSubtractionCmd(cmdBuffer);
     copyImage(cmdBuffer, velocity_field_[1].color.image,
               velocity_field_[0].color.image);
 
@@ -1083,10 +1080,10 @@ class VulkanExample : public VulkanExampleBase {
         vks::initializers::renderPassBeginInfo();
     renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
     renderPassBeginInfo.framebuffer = color_field_[1].framebuffer;
-    renderPassBeginInfo.renderArea.offset.x = 0;
-    renderPassBeginInfo.renderArea.offset.y = 0;
-    renderPassBeginInfo.renderArea.extent.width = width_;
-    renderPassBeginInfo.renderArea.extent.height = height_;
+    renderPassBeginInfo.renderArea.offset.x = SLAB_OFFSET;
+    renderPassBeginInfo.renderArea.offset.y = SLAB_OFFSET;
+    renderPassBeginInfo.renderArea.extent.width = width_ - 2 * SLAB_OFFSET;
+    renderPassBeginInfo.renderArea.extent.height = height_ - 2 * SLAB_OFFSET;
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
@@ -1423,7 +1420,7 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdEndRenderPass(cmdBuffer);
   }
 
-  void gradientCmd(VkCommandBuffer& cmdBuffer) {
+  void gradientSubtractionCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
     clearValues.color = {0.f, 0.0f, 0.0f, 0.f};
 

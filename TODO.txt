@@ -8,6 +8,7 @@ TODO:
 - init velocity field e.g. (u, v) = sin(y), sin(x)
 - velocity field viewer with arrows?
 - add different colors to checkerboard
+- bug, velocity color and pressure maps are always the same value at the borders
 
 
 
@@ -29,7 +30,7 @@ divergence(w=velocity_field, float halfrdx) -> div_texture
 4b. Jacobi (40-80 iterations)
 jacobi(x=pressure_field, b=div_texture, float alpha, float beta) -> pressure_field
 
-4c. Gradient
+4c. Gradient subtraction
 gradient(p=pressure_field, w=velocity) -> velocity_field
 
 # Boundary
