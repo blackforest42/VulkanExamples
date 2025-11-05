@@ -1222,6 +1222,9 @@ class VulkanExample : public VulkanExampleBase {
                         &ubos_.textureViewSwitcher.chooseDisplayTexture,
                         texture_viewer_selection);
       overlay->checkBox("Show velocity arrows", &showVelocityArrows_);
+      if (overlay->button("Reset")) {
+        windowResized();
+      }
     }
   }
 
