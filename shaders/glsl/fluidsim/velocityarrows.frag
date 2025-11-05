@@ -8,5 +8,5 @@ layout(location = 0) out vec4 outFragColor;
 
 void main() {
     // red triangle
-    outFragColor = vec4(1.0f, 0, 0, 1.f);
+    outFragColor = vec4(1.0f, 0.0f, 0.0f, 1.f);
 }

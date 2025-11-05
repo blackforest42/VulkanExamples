@@ -21,7 +21,7 @@ class VulkanExample : public VulkanExampleBase {
   const uint32_t JACOBI_ITERATIONS = 100;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 10;
-  static constexpr float TIME_STEP{1.f / 60};
+  static constexpr float TIME_STEP{1.f / 600};
 
   struct Vertex {
     glm::vec2 pos;
@@ -58,6 +58,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct ColorInitUBO {
     alignas(8) glm::vec2 bufferResolution{};
+    alignas(4) int whichTexture{};
   };
 
   struct AdvectionUBO {
@@ -205,7 +206,8 @@ class VulkanExample : public VulkanExampleBase {
   // feedback control for mouse click + movement
   bool addImpulse_ = false;
   bool shouldInitColorField_ = true;
-  bool showVelocityArrows_ = false;
+  bool shouldInitVelocityField_ = true;
+  bool showVelocityArrows_ = true;
   std::vector<std::string> texture_viewer_selection = {"Color", "Velocity",
                                                        "Pressure"};
 
@@ -1237,6 +1239,9 @@ class VulkanExample : public VulkanExampleBase {
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
 
     if (shouldInitColorField_) {
+      ubos_.colorInit.whichTexture = 0;
+      memcpy(uniformBuffers_[currentBuffer_].colorInit.mapped, &ubos_.colorInit,
+             sizeof(BoundaryUBO));
       initColorCmd(cmdBuffer);
       copyImage(cmdBuffer, color_field_[1].color.image,
                 color_field_[0].color.image);
@@ -1874,6 +1879,7 @@ class VulkanExample : public VulkanExampleBase {
     prepareVertices();
 
     shouldInitColorField_ = true;
+    shouldInitVelocityField_ = true;
     resized_ = false;
   }
 

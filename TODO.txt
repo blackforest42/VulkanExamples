@@ -3,7 +3,6 @@ Nov 3
 TODO: 
 - init velocity field e.g. (u, v) = sin(y), sin(x)
 - add different colors to checkerboard
-- reset button
 - bug: velocity color and pressure maps are always the same value at the borders
 
 DONE:
