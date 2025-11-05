@@ -10,6 +10,7 @@ glslc textureviewswitcher.frag -o textureviewswitcher.frag.spv
 glslc impulse.frag -o impulse.frag.spv
 glslc velocityarrows.vert -o velocityarrows.vert.spv
 glslc velocityarrows.frag -o velocityarrows.frag.spv
+glslc colorpass.frag -o colorpass.frag.spv
 
 
 # Use `toktx` to create a .ktx cubemap from 6 .png files
