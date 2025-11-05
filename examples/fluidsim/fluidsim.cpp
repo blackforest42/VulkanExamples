@@ -205,8 +205,9 @@ class VulkanExample : public VulkanExampleBase {
   // feedback control for mouse click + movement
   bool addImpulse_ = false;
   bool shouldInitColorField_ = true;
-  std::vector<std::string> texture_viewer_selection = {"color", "velocity",
-                                                       "pressure"};
+  bool showVelocityArrows_ = false;
+  std::vector<std::string> texture_viewer_selection = {"Color", "Velocity",
+                                                       "Pressure"};
 
   VulkanExample() {
     title = "Fluid Simulation";
@@ -1220,6 +1221,7 @@ class VulkanExample : public VulkanExampleBase {
       overlay->comboBox("Texture map viewer",
                         &ubos_.textureViewSwitcher.chooseDisplayTexture,
                         texture_viewer_selection);
+      overlay->checkBox("Show velocity arrows", &showVelocityArrows_);
     }
   }
 
@@ -1280,10 +1282,12 @@ class VulkanExample : public VulkanExampleBase {
     copyImage(cmdBuffer, color_pass_[1].color.image,
               color_pass_[0].color.image);
 
-    // Draw arrows
-    velocityArrowsCmd(cmdBuffer);
-    copyImage(cmdBuffer, color_pass_[1].color.image,
-              color_pass_[0].color.image);
+    if (showVelocityArrows_) {
+      // Draw arrows
+      velocityArrowsCmd(cmdBuffer);
+      copyImage(cmdBuffer, color_pass_[1].color.image,
+                color_pass_[0].color.image);
+    }
 
     // Color pass
     colorPassCmd(cmdBuffer);
