@@ -1305,7 +1305,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void initColorCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 1.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1343,8 +1343,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1366,7 +1366,7 @@ class VulkanExample : public VulkanExampleBase {
                     std::array<FrameBuffer, 2>& output_field,
                     VkDescriptorSet* descriptor_set) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1404,8 +1404,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1415,7 +1415,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void impulseCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1453,8 +1453,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1481,7 +1481,7 @@ class VulkanExample : public VulkanExampleBase {
     ubos_.boundary.scale = 1;
     memcpy(uniformBuffers_[currentBuffer_].boundary.mapped, &ubos_.boundary,
            sizeof(BoundaryUBO));
-    boundaryCmd(cmdBuffer, pressure_field_,
+    boundaryCmd(cmdBuffer, color_field_,
                 &descriptorSets_[currentBuffer_].boundaryColor);
   }
 
@@ -1527,21 +1527,12 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
-  }
-
-  void velocityJacobiCmd(VkCommandBuffer& cmdBuffer) {
-    ubos_.jacobi.alpha = 1.f * 1.f / (TIME_STEP);
-    ubos_.jacobi.beta = 1.0f / (4.0f + ubos_.jacobi.alpha);
-    memcpy(uniformBuffers_[currentBuffer_].boundary.mapped, &ubos_.jacobi,
-           sizeof(JacobiUBO));
-    jacobiCmd(cmdBuffer, velocity_field_,
-              &descriptorSets_[currentBuffer_].jacobiVelocity);
   }
 
   void pressureJacobiCmd(VkCommandBuffer& cmdBuffer) {
@@ -1557,7 +1548,7 @@ class VulkanExample : public VulkanExampleBase {
                  std::array<FrameBuffer, 2>& output_field,
                  VkDescriptorSet* descriptor_set) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1595,8 +1586,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1605,7 +1596,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void divergenceCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1643,8 +1634,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1690,8 +1681,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1700,7 +1691,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void textureViewSwitcherCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.f, 0.0f, 1.0f, 0.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1738,8 +1729,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1748,7 +1739,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void velocityArrowsCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {0.f, 10.0f, 0.0f, 0.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1789,8 +1780,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
@@ -1837,8 +1828,8 @@ class VulkanExample : public VulkanExampleBase {
       memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
       memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 1, &memBarrier, 0,
                            nullptr, 0, nullptr);
     }
