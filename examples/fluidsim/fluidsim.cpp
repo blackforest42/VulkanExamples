@@ -1250,8 +1250,8 @@ class VulkanExample : public VulkanExampleBase {
     }
 
     // Advect Velocity
-    advectVelocityCmd(cmdBuffer);
     velocityBoundaryCmd(cmdBuffer);
+    advectVelocityCmd(cmdBuffer);
     copyImage(cmdBuffer, velocity_field_[1].color.image,
               velocity_field_[0].color.image);
 
@@ -1268,21 +1268,21 @@ class VulkanExample : public VulkanExampleBase {
 
     // Jacobi Iteration: Pressure
     for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-      pressureJacobiCmd(cmdBuffer);
       pressureBoundaryCmd(cmdBuffer);
+      pressureJacobiCmd(cmdBuffer);
       copyImage(cmdBuffer, pressure_field_[1].color.image,
                 pressure_field_[0].color.image);
     }
 
     // Gradient subtraction
-    gradientSubtractionCmd(cmdBuffer);
     velocityBoundaryCmd(cmdBuffer);
+    gradientSubtractionCmd(cmdBuffer);
     copyImage(cmdBuffer, velocity_field_[1].color.image,
               velocity_field_[0].color.image);
 
     // Advect Color
-    advectColorCmd(cmdBuffer);
     colorBoundaryCmd(cmdBuffer);
+    advectColorCmd(cmdBuffer);
     copyImage(cmdBuffer, color_field_[1].color.image,
               color_field_[0].color.image);
 
