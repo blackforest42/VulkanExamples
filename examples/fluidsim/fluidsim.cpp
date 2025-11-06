@@ -213,6 +213,9 @@ class VulkanExample : public VulkanExampleBase {
   std::vector<std::string> texture_viewer_selection = {"Color", "Velocity",
                                                        "Pressure"};
 
+  PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT{nullptr};
+  PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT{nullptr};
+
   VulkanExample() {
     title = "Fluid Simulation";
     camera_.type_ = Camera::CameraType::lookat;
@@ -230,6 +233,7 @@ class VulkanExample : public VulkanExampleBase {
     prepareOffscreen();
     setupDescriptors();
     preparePipelines();
+    prepareDebug();
     prepared_ = true;
   }
 
@@ -248,6 +252,7 @@ class VulkanExample : public VulkanExampleBase {
         }
       }
     }
+
     VkBufferCreateInfo bufferInfo{};
     VK_CHECK_RESULT(vulkanDevice_->createBuffer(
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -412,7 +417,7 @@ class VulkanExample : public VulkanExampleBase {
     sampler.magFilter = VK_FILTER_LINEAR;
     sampler.minFilter = VK_FILTER_LINEAR;
     sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler.addressModeV = sampler.addressModeU;
     sampler.addressModeW = sampler.addressModeU;
     sampler.mipLodBias = 0.0f;
@@ -1150,6 +1155,28 @@ class VulkanExample : public VulkanExampleBase {
                                               &pipelines_.velocityArrows));
   }
 
+  void prepareDebug() {
+    vkCmdBeginDebugUtilsLabelEXT =
+        reinterpret_cast<PFN_vkCmdBeginDebugUtilsLabelEXT>(
+            vkGetInstanceProcAddr(instance_, "vkCmdBeginDebugUtilsLabelEXT"));
+    vkCmdEndDebugUtilsLabelEXT =
+        reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(
+            vkGetInstanceProcAddr(instance_, "vkCmdEndDebugUtilsLabelEXT"));
+  }
+
+  void cmdBeginLabel(VkCommandBuffer command_buffer,
+                     const char* label_name,
+                     std::vector<float> color) {
+    VkDebugUtilsLabelEXT label = {VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
+    label.pLabelName = label_name;
+    memcpy(label.color, color.data(), sizeof(float) * 4);
+    vkCmdBeginDebugUtilsLabelEXT(command_buffer, &label);
+  }
+
+  void cmdEndLabel(VkCommandBuffer command_buffer) {
+    vkCmdEndDebugUtilsLabelEXT(command_buffer);
+  }
+
   // Part B (rendering)
   void render() override {
     if (!prepared_)
@@ -1244,15 +1271,18 @@ class VulkanExample : public VulkanExampleBase {
     }
 
     // Divergence
+    cmdBeginLabel(cmdBuffer, "Divergence", {0.0f, 0.7f, 0.7f, 1.0f});
     divergenceCmd(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
 
     // Jacobi Iteration: Pressure
+    cmdBeginLabel(cmdBuffer, "Jacobi for Pressure", {0.0f, 0.7f, 0.7f, 1.0f});
     for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-      // pressureBoundaryCmd(cmdBuffer);
       pressureJacobiCmd(cmdBuffer);
       copyImage(cmdBuffer, pressure_field_[1].color.image,
                 pressure_field_[0].color.image);
     }
+    cmdEndLabel(cmdBuffer);
 
     // Gradient subtraction
     gradientSubtractionCmd(cmdBuffer);
@@ -1297,6 +1327,8 @@ class VulkanExample : public VulkanExampleBase {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
+    cmdBeginLabel(cmdBuffer, "Initialize Color Field Command",
+                  {0.0f, 0.7f, 0.7f, 1.0f});
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1329,16 +1361,21 @@ class VulkanExample : public VulkanExampleBase {
     }
 
     vkCmdEndRenderPass(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
   }
 
   void advectColorCmd(VkCommandBuffer& cmdBuffer) {
+    cmdBeginLabel(cmdBuffer, "Advecting Color", {0.0f, 0.7f, 0.7f, 1.0f});
     advectionCmd(cmdBuffer, color_field_,
                  &descriptorSets_[currentBuffer_].advectColor);
+    cmdEndLabel(cmdBuffer);
   }
 
   void advectVelocityCmd(VkCommandBuffer& cmdBuffer) {
+    cmdBeginLabel(cmdBuffer, "Advecting velocity", {0.0f, 0.7f, 0.7f, 1.0f});
     advectionCmd(cmdBuffer, velocity_field_,
                  &descriptorSets_[currentBuffer_].advectVelocity);
+    cmdEndLabel(cmdBuffer);
   }
 
   void advectionCmd(VkCommandBuffer& cmdBuffer,
@@ -1407,6 +1444,7 @@ class VulkanExample : public VulkanExampleBase {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
+    cmdBeginLabel(cmdBuffer, "Adding impulse", {0.0f, 0.7f, 0.7f, 1.0f});
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1438,6 +1476,7 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
   }
 
   void velocityBoundaryCmd(VkCommandBuffer& cmdBuffer) {
@@ -1627,6 +1666,7 @@ class VulkanExample : public VulkanExampleBase {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
+    cmdBeginLabel(cmdBuffer, "Gradient Subtraction", {0.0f, 0.7f, 0.7f, 1.0f});
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
@@ -1657,6 +1697,7 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
   }
 
   void textureViewSwitcherCmd(VkCommandBuffer& cmdBuffer) {
@@ -1674,6 +1715,7 @@ class VulkanExample : public VulkanExampleBase {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
+    cmdBeginLabel(cmdBuffer, "Texture View Switcher", {0.0f, 0.7f, 0.7f, 1.0f});
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
@@ -1705,6 +1747,7 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
   }
 
   void velocityArrowsCmd(VkCommandBuffer& cmdBuffer) {
@@ -1722,6 +1765,7 @@ class VulkanExample : public VulkanExampleBase {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
+    cmdBeginLabel(cmdBuffer, "Velocity Field Arrows", {0.0f, 0.7f, 0.7f, 1.0f});
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
@@ -1756,6 +1800,7 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
   }
 
   void colorPassCmd(VkCommandBuffer& cmdBuffer) {
@@ -1773,6 +1818,7 @@ class VulkanExample : public VulkanExampleBase {
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValues;
 
+    cmdBeginLabel(cmdBuffer, "Color Pass", {0.0f, 0.7f, 0.7f, 1.0f});
     vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
                          VK_SUBPASS_CONTENTS_INLINE);
     VkViewport viewport =
@@ -1804,6 +1850,7 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
+    cmdEndLabel(cmdBuffer);
   }
 
   // Copy framebuffer color attachmebt from source to dest
@@ -1826,9 +1873,11 @@ class VulkanExample : public VulkanExampleBase {
     copyRegion.extent.height = static_cast<uint32_t>(height_);
     copyRegion.extent.depth = 1;
 
+    cmdBeginLabel(cmdBuffer, "Copying image", {1.0f, 0.78f, 0.05f, 1.0f});
     // Copy output of write to read buffer
     vkCmdCopyImage(cmdBuffer, source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                    dest, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+    cmdEndLabel(cmdBuffer);
   }
 
   void windowResized() override {

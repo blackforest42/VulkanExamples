@@ -5,7 +5,8 @@ TODO:
 	- mine with grad subtration behaves like webgpu without gradient subtraction
 	- it might mean gradient.frag is having little to no effect on vel field
 - figure out why fract() only works on pressure field and not color and vel.
-- bug: vel advection works like webgpu
+- bug: velocity advection works like webgpu
+
 
 DONE:
 - add different colors to checkerboard

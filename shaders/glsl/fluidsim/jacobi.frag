@@ -21,14 +21,16 @@ void main() {
 	float du = dudv.x;
 	float dv = dudv.y;
 
-	// left, right, bottom, and top x samples
+	// Pressure
 	vec4 xL = texture(pressureTex, (inUV - vec2(du, 0)));
 	vec4 xR = texture(pressureTex, (inUV + vec2(du, 0)));
 	vec4 xB = texture(pressureTex, (inUV - vec2(0, dv)));
 	vec4 xT = texture(pressureTex, (inUV + vec2(0, dv)));
-	// b sample, from center
+
+	// Divergence
 	vec4 bC = texture(divergenceTex, inUV);
+
 	// evaluate Jacobi iteration
-	outFragColor = (xL + xR + xB + xT + bC) * 0.25f;
+	outFragColor = (xL + xR + xB + xT + -1 * bC) * 0.25f;
 
 }

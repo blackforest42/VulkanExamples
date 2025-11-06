@@ -17,7 +17,10 @@ layout (binding = 2) uniform sampler2D textureToAdvect;
 
 void main() {
 	// follow the velocity field "back in time"
-	vec2 pos = (inUV - ubo.timestep * texture(velocityTex, inUV).xy);
+	vec2 pos = (inUV - 0.5 * ubo.timestep * texture(velocityTex, inUV).xy);
+	if (pos.x < 0 || pos.y < 0) {
+		debugPrintfEXT("%v2f", pos);
+	}
 	// interpolate and write to the output fragment
 	outFragColor = texture(textureToAdvect, pos);
 
