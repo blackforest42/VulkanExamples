@@ -32,5 +32,5 @@ void main() {
 
 	float rad = ubo.radius;
 	outFragColor = texture(velocityField, inUV) + 
-		vec4(-100 * dxdy.x, -100 * dxdy.y, 0, 1) * gaussian(delta_distance, rad);
+		vec4(-10 * dxdy.x, -10 * dxdy.y, 0, 1) * gaussian(delta_distance, rad);
 }
