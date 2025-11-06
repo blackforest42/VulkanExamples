@@ -18,7 +18,7 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  const uint32_t JACOBI_ITERATIONS = 10;
+  const uint32_t JACOBI_ITERATIONS = 100;
   // Inner slab offset (in pixels) for x and y axis
   const uint32_t SLAB_OFFSET = 0;
   static constexpr float TIME_STEP{1.f / 120};
@@ -146,7 +146,6 @@ class VulkanExample : public VulkanExampleBase {
     VkDescriptorSet boundaryVelocity;
     VkDescriptorSet boundaryPressure;
     VkDescriptorSet boundaryColor;
-    VkDescriptorSet jacobiVelocity;
     VkDescriptorSet jacobiPressure;
     VkDescriptorSet divergence;
     VkDescriptorSet gradient;
@@ -210,6 +209,7 @@ class VulkanExample : public VulkanExampleBase {
   bool shouldInitColorField_ = true;
   bool shouldInitVelocityField_ = true;
   bool showVelocityArrows_ = true;
+  bool advectVelocity_ = false;
   std::vector<std::string> texture_viewer_selection = {"Color", "Velocity",
                                                        "Pressure"};
 
@@ -816,29 +816,6 @@ class VulkanExample : public VulkanExampleBase {
                              static_cast<uint32_t>(writeDescriptorSets.size()),
                              writeDescriptorSets.data(), 0, nullptr);
 
-      // Jacobi: Velocity
-      allocInfo = vks::initializers::descriptorSetAllocateInfo(
-          descriptorPool_, &descriptorSetLayouts_.jacobi, 1);
-      VK_CHECK_RESULT(vkAllocateDescriptorSets(
-          device_, &allocInfo, &descriptorSets_[i].jacobiVelocity));
-      writeDescriptorSets = {
-          vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].jacobiVelocity,
-              VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-              /*binding id*/ 0, &uniformBuffers_[i].jacobi.descriptor),
-          vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].jacobiVelocity,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              /*binding id*/ 1, &velocity_field_[0].descriptor),
-          vks::initializers::writeDescriptorSet(
-              descriptorSets_[i].jacobiVelocity,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              /*binding id*/ 2, &velocity_field_[0].descriptor),
-      };
-      vkUpdateDescriptorSets(device_,
-                             static_cast<uint32_t>(writeDescriptorSets.size()),
-                             writeDescriptorSets.data(), 0, nullptr);
-
       // Jacobi: Pressure
       allocInfo = vks::initializers::descriptorSetAllocateInfo(
           descriptorPool_, &descriptorSetLayouts_.jacobi, 1);
@@ -1226,6 +1203,7 @@ class VulkanExample : public VulkanExampleBase {
                         &ubos_.textureViewSwitcher.chooseDisplayTexture,
                         texture_viewer_selection);
       overlay->checkBox("Show velocity arrows", &showVelocityArrows_);
+      overlay->checkBox("Advect velocity", &advectVelocity_);
       if (overlay->button("Reset")) {
         windowResized();
       }
@@ -1251,10 +1229,11 @@ class VulkanExample : public VulkanExampleBase {
     }
 
     // Advect Velocity
-    velocityBoundaryCmd(cmdBuffer);
-    advectVelocityCmd(cmdBuffer);
-    copyImage(cmdBuffer, velocity_field_[1].color.image,
-              velocity_field_[0].color.image);
+    if (advectVelocity_) {
+      advectVelocityCmd(cmdBuffer);
+      copyImage(cmdBuffer, velocity_field_[1].color.image,
+                velocity_field_[0].color.image);
+    }
 
     // Impulse
     if (addImpulse_) {
@@ -1269,20 +1248,18 @@ class VulkanExample : public VulkanExampleBase {
 
     // Jacobi Iteration: Pressure
     for (uint32_t i = 0; i < JACOBI_ITERATIONS; i++) {
-      pressureBoundaryCmd(cmdBuffer);
+      // pressureBoundaryCmd(cmdBuffer);
       pressureJacobiCmd(cmdBuffer);
       copyImage(cmdBuffer, pressure_field_[1].color.image,
                 pressure_field_[0].color.image);
     }
 
     // Gradient subtraction
-    velocityBoundaryCmd(cmdBuffer);
     gradientSubtractionCmd(cmdBuffer);
     copyImage(cmdBuffer, velocity_field_[1].color.image,
               velocity_field_[0].color.image);
 
     // Advect Color
-    colorBoundaryCmd(cmdBuffer);
     advectColorCmd(cmdBuffer);
     copyImage(cmdBuffer, color_field_[1].color.image,
               color_field_[0].color.image);
@@ -1373,7 +1350,7 @@ class VulkanExample : public VulkanExampleBase {
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
     renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
-    renderPassBeginInfo.framebuffer = output_field[currentBuffer_].framebuffer;
+    renderPassBeginInfo.framebuffer = output_field[1].framebuffer;
     renderPassBeginInfo.renderArea.offset.x = SLAB_OFFSET;
     renderPassBeginInfo.renderArea.offset.y = SLAB_OFFSET;
     renderPassBeginInfo.renderArea.extent.width = width_ - 2 * SLAB_OFFSET;
@@ -1490,6 +1467,7 @@ class VulkanExample : public VulkanExampleBase {
   void boundaryCmd(VkCommandBuffer& cmdBuffer,
                    std::array<FrameBuffer, 2>& output_field,
                    VkDescriptorSet* descriptor_set) {
+    /*
     VkClearValue clearValues{};
     clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
@@ -1535,25 +1513,17 @@ class VulkanExample : public VulkanExampleBase {
                            nullptr, 0, nullptr);
     }
     vkCmdEndRenderPass(cmdBuffer);
+*/
   }
 
   void pressureJacobiCmd(VkCommandBuffer& cmdBuffer) {
-    memcpy(uniformBuffers_[currentBuffer_].boundary.mapped, &ubos_.jacobi,
-           sizeof(JacobiUBO));
-    jacobiCmd(cmdBuffer, pressure_field_,
-              &descriptorSets_[currentBuffer_].jacobiPressure);
-  }
-
-  void jacobiCmd(VkCommandBuffer& cmdBuffer,
-                 std::array<FrameBuffer, 2>& output_field,
-                 VkDescriptorSet* descriptor_set) {
     VkClearValue clearValues{};
     clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
     renderPassBeginInfo.renderPass = offscreenPass_.renderPass;
-    renderPassBeginInfo.framebuffer = output_field[1].framebuffer;
+    renderPassBeginInfo.framebuffer = pressure_field_[1].framebuffer;
     renderPassBeginInfo.renderArea.offset.x = SLAB_OFFSET;
     renderPassBeginInfo.renderArea.offset.y = SLAB_OFFSET;
     renderPassBeginInfo.renderArea.extent.width = width_ - 2 * SLAB_OFFSET;
@@ -1571,9 +1541,9 @@ class VulkanExample : public VulkanExampleBase {
     VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayouts_.jacobi, 0, 1, descriptor_set, 0,
-                            nullptr);
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.jacobi, 0,
+        1, &descriptorSets_[currentBuffer_].jacobiPressure, 0, nullptr);
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_.jacobi);

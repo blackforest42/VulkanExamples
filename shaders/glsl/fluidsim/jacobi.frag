@@ -17,16 +17,15 @@ layout (binding = 2) uniform sampler2D divergenceTex;
 
 
 void main() {
-	vec2 dudv = 1 / ubo.bufferResolution;
+	vec2 dudv = 1.f / ubo.bufferResolution;
 	float du = dudv.x;
 	float dv = dudv.y;
 
-
 	// left, right, bottom, and top x samples
-	vec4 xL = texture(pressureTex, inUV - vec2(du, 0));
-	vec4 xR = texture(pressureTex, inUV + vec2(du, 0));
-	vec4 xB = texture(pressureTex, inUV - vec2(0, dv));
-	vec4 xT = texture(pressureTex, inUV + vec2(0, dv));
+	vec4 xL = texture(pressureTex, (inUV - vec2(du, 0)));
+	vec4 xR = texture(pressureTex, (inUV + vec2(du, 0)));
+	vec4 xB = texture(pressureTex, (inUV - vec2(0, dv)));
+	vec4 xT = texture(pressureTex, (inUV + vec2(0, dv)));
 	// b sample, from center
 	vec4 bC = texture(divergenceTex, inUV);
 	// evaluate Jacobi iteration

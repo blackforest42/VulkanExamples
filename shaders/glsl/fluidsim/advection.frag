@@ -12,13 +12,13 @@ layout (binding = 0) uniform UBO
 	float timestep;
 } ubo;
 
-layout (binding = 1) uniform sampler2D field1; // velocity field
-layout (binding = 2) uniform sampler2D field2; // color field
+layout (binding = 1) uniform sampler2D velocityTex;
+layout (binding = 2) uniform sampler2D textureToAdvect;
 
 void main() {
 	// follow the velocity field "back in time"
-	vec2 pos = inUV - ubo.timestep * texture(field1, inUV).xy;
+	vec2 pos = (inUV - ubo.timestep * texture(velocityTex, inUV).xy);
 	// interpolate and write to the output fragment
-	outFragColor = texture(field2, pos);
+	outFragColor = texture(textureToAdvect, pos);
 
 }
