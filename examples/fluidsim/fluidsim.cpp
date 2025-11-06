@@ -18,10 +18,10 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
-  const uint32_t JACOBI_ITERATIONS = 100;
+  const uint32_t JACOBI_ITERATIONS = 10;
   // Inner slab offset (in pixels) for x and y axis
-  const uint32_t SLAB_OFFSET = 2;
-  static constexpr float TIME_STEP{1.f / 600};
+  const uint32_t SLAB_OFFSET = 0;
+  static constexpr float TIME_STEP{1.f / 120};
 
   struct Vertex {
     glm::vec2 pos;
@@ -1491,7 +1491,7 @@ class VulkanExample : public VulkanExampleBase {
                    std::array<FrameBuffer, 2>& output_field,
                    VkDescriptorSet* descriptor_set) {
     VkClearValue clearValues{};
-    clearValues.color = {0.0f, 0.0f, 0.0f, 1.f};
+    clearValues.color = {0.0f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
@@ -1790,7 +1790,7 @@ class VulkanExample : public VulkanExampleBase {
 
   void colorPassCmd(VkCommandBuffer& cmdBuffer) {
     VkClearValue clearValues{};
-    clearValues.color = {1.f, 0.0f, 0.0f, 0.f};
+    clearValues.color = {0.f, 0.0f, 0.0f, 0.f};
 
     VkRenderPassBeginInfo renderPassBeginInfo =
         vks::initializers::renderPassBeginInfo();
