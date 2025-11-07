@@ -396,25 +396,22 @@ public:
         frameBuf->descriptor.sampler = offscreenPass_.sampler;
     }
 
-    // (A.4)
-    void setupDescriptors() {
-        // Pool
-        // BUG: Magic numbers 8, 6, 4, up ahead. Removing them causes runtime error.
-        std::vector<VkDescriptorPoolSize> poolSizes = {
-            vks::initializers::descriptorPoolSize(
-                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                /* descriptorCount */ MAX_CONCURRENT_FRAMES * 10 *
-                                      NUM_SAMPLE_SIZES),
-            vks::initializers::descriptorPoolSize(
-                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                /* descriptorCount */ MAX_CONCURRENT_FRAMES * 8 *
-                                      NUM_SAMPLE_SIZES)
-        };
-        VkDescriptorPoolCreateInfo descriptorPoolInfo =
-                vks::initializers::descriptorPoolCreateInfo(
-                    poolSizes, MAX_CONCURRENT_FRAMES * 6 * NUM_SAMPLE_SIZES);
-        VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
-            nullptr, &descriptorPool_));
+  // (A.4)
+  void setupDescriptors() {
+    // Pool
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+        vks::initializers::descriptorPoolSize(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 1 * NUM_SAMPLE_SIZES),
+        vks::initializers::descriptorPoolSize(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            /* descriptorCount */ MAX_CONCURRENT_FRAMES * 2 *
+                NUM_SAMPLE_SIZES)};
+    VkDescriptorPoolCreateInfo descriptorPoolInfo =
+        vks::initializers::descriptorPoolCreateInfo(
+            poolSizes, MAX_CONCURRENT_FRAMES * 5 * NUM_SAMPLE_SIZES);
+    VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
+                                           nullptr, &descriptorPool_));
 
         // Layout: Blackhole
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {

@@ -1,2 +1,39 @@
+<<<<<<< HEAD
 Oct 20
 	- No accretion disk spinning in Linux
+=======
+Nov 3
+
+TODO: 
+	- add ink splat to the impulse frag?
+
+DONE:
+	- i am happy with this state
+
+
+
+### Fluid sim
+1. Advection
+advection(float timestep, float rdx, u=velocity_field, x=velocity_field) -> velocity_field
+
+2. Force
+- 2D gaussian splat
+
+3. Viscous Diffusion (20-50 iterations)
+jacobi(x=velocity_field, b=velocity_field) -> velocity_field
+
+4. Projection
+4a. Divergence
+Note: divergence pass is only relevant for non-boundary cells
+divergence(w=velocity_field, float halfrdx) -> div_texture
+
+4b. Jacobi (40-80 iterations)
+jacobi(x=pressure_field, b=div_texture, float alpha, float beta) -> pressure_field
+
+4c. Gradient subtraction
+gradient(p=pressure_field, w=velocity) -> velocity_field
+
+# Boundary
+boundary(x=texture_map) -> texture_map
+
+>>>>>>> navier-stokes
