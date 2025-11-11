@@ -20,7 +20,7 @@ void main() {
 	float y = inUV.y;
 	//x *= ubo.bufferResolution.x / ubo.bufferResolution.y;
 
-	// init color map to checkerboard
+	// init color map as checkerboard
 	float r, g, b;
 	r = step(1.0, mod(floor((x + 1.0) / 0.2) + floor((y + 1.0) / 0.2), 2.0));
 	b = step(1.0, mod(floor((x + 1.0) / 0.3) + floor((y + 1.0) / 0.3), 2.0));
