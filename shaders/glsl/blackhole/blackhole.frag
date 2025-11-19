@@ -103,7 +103,7 @@ void main() {
 
 void AccDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
   float innerRadius = 2.6;
-  float outerRadius = 12.0;
+  float outerRadius = 11.0;
 
   // Density linearly decreases as the distance to the blackhole center
   // increases.
@@ -126,7 +126,7 @@ void AccDiskColor(vec3 pos, inout vec3 color, inout float alpha) {
 
   vec3 sphericalCoord = toSpherical(pos);
 
-  // Scale the rho and phi so that the particales appear to be at the correct
+  // Scale the radius and phi so that the particales appear to be at the correct
   // scale visually.
   sphericalCoord.y *= 2.0;
   sphericalCoord.z *= 4.0;
@@ -349,13 +349,13 @@ vec3 rotateVector(vec3 position, vec3 axis, float angle) {
   return vec3(qr.x, qr.y, qr.z);
 }
 
-// Convert from Cartesian to spherical coord (rho, phi, theta)
+// Convert from Cartesian to spherical coord (radius, phi, theta)
 // https://en.wikipedia.org/wiki/Spherical_coordinate_system
 vec3 toSpherical(vec3 p) {
-  float rho = sqrt((p.x * p.x) + (p.y * p.y) + (p.z * p.z));
+  float radius = length(p);
   float theta = atan(p.z, p.x);
-  float phi = asin(p.y / rho);
-  return vec3(rho, theta, phi);
+  float phi = asin(p.y / radius);
+  return vec3(radius, theta, phi);
 }
 
 void ringColor(vec3 rayOrigin,
