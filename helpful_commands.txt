@@ -17,5 +17,7 @@ glslc -g colorpass.frag -o colorpass.frag.spv
 # Use `toktx` to create a .ktx cubemap from 6 .png files
 toktx --target_type RGBA --cubemap  cubemap.ktx  .\left.png .\right.png .\top.png .\bottom.png .\back.png .\front.png 
 
+toktx --target_type R  --assign_oetf linear iceland_heightmap.ktx .\iceland_heightmap.png
+
 ## Output
 toktx warning! Converting gamma 2.2f to sRGB. Use --assign-oetf srgb to force treating input as sRGB.

@@ -168,6 +168,7 @@ set(EXAMPLES
 	stencilbuffer
 	subpasses
 	terraintessellation
+	terraintessellation2
 	tessellation
 	textoverlay
 	texture
