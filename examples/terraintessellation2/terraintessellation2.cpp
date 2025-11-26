@@ -20,6 +20,13 @@ class VulkanExample : public VulkanExampleBase {
     vks::Texture2D heightMap{};
   } textures_;
 
+  // Holds the buffers for rendering the tessellated terrain
+  struct {
+    vks::Buffer vertexBuffer;
+    vks::Buffer indexBuffer;
+    uint32_t indexCount{};
+  } terrain;
+
   VulkanExample() : VulkanExampleBase() {
     title = "Dynamic terrain tessellation";
     camera_.type_ = Camera::CameraType::firstperson;
@@ -42,23 +49,35 @@ class VulkanExample : public VulkanExampleBase {
     ktx_uint8_t* ktxImage = ktxTexture_GetData(ktxTexture);
     uint32_t COLS = ktxTexture->baseWidth;
     uint32_t ROWS = ktxTexture->baseHeight;
-    std::vector<std::vector<float>> height_data(ROWS, std::vector<float>(COLS));
-    int i = 0;
+    float height_scale = 64.0f / 256.0f;
+    // Adjusts vertical translation of height map. e.g. Below or above
+    // surface.
+    float height_shift = 16.f;
+    // Generate vertices
+    std::vector<vkglTF::Vertex> vertices(ROWS * COLS);
+    i = 0;
     for (int r = 0; r < ROWS; r++) {
       for (int c = 0; c < COLS; c++) {
-        height_data[r][c] = ktxImage[i++];
+        // Read height map for 'y' value. Normalize to [0, 1] then rescale and
+        // translate (up or down).
+        float height = ktxImage[i++] * height_scale - height_shift;
+
+        vertices[i].pos[0] = c - COLS / 2.f;
+        vertices[i].pos[1] = height;
+        vertices[i].pos[2] = r - ROWS / 2.f;
+
+        i++;
       }
     }
     ktxTexture_Destroy(ktxTexture);
 
-    std::vector<float> vertices;
-    // Normalize to [0, 1] then rescale to 64
-    float height_scale = 64.0f / 256.0f;
-    // Adjusts vertical translation of height map. e.g. Below or above surface.
-    float height_shift = 16.f;
-
-    for (int r = 0; r < ROWS; r++) {
+    // Generate indices
+    std::vector<int> indices;
+    for (int r = 0; r < ROWS - 1; r++) {
       for (int c = 0; c < COLS; c++) {
+        for (int k = 0; k < 2; k++) {
+          indices.push_back(c + COLS * (r + k));
+        }
       }
     }
   }
