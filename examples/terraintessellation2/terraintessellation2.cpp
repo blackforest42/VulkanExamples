@@ -8,6 +8,7 @@
 
 #include <ktx.h>
 #include <ktxvulkan.h>
+
 #include "VulkanglTFModel.h"
 #include "frustum.hpp"
 #include "vulkanexamplebase.h"
@@ -81,16 +82,56 @@ class VulkanExample : public VulkanExampleBase {
     prepared_ = true;
   }
 
-  void buildCommandBuffer() {}
+  void buildCommandBuffer() {
+    VkCommandBuffer cmdBuffer = drawCmdBuffers_[currentBuffer_];
+
+    VkCommandBufferBeginInfo cmdBufInfo =
+        vks::initializers::commandBufferBeginInfo();
+
+    VkClearValue clearValues[2]{};
+    clearValues[0].color = defaultClearColor;
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    VkRenderPassBeginInfo renderPassBeginInfo =
+        vks::initializers::renderPassBeginInfo();
+    renderPassBeginInfo.renderPass = renderPass_;
+    renderPassBeginInfo.renderArea.offset.x = 0;
+    renderPassBeginInfo.renderArea.offset.y = 0;
+    renderPassBeginInfo.renderArea.extent.width = width_;
+    renderPassBeginInfo.renderArea.extent.height = height_;
+    renderPassBeginInfo.clearValueCount = 2;
+    renderPassBeginInfo.pClearValues = clearValues;
+    renderPassBeginInfo.framebuffer = frameBuffers_[currentImageIndex_];
+
+    VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
+
+    vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport =
+        vks::initializers::viewport((float)width_, (float)height_, 0.0f, 1.0f);
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+    vkCmdSetLineWidth(cmdBuffer, 1.0f);
+
+    drawUI(cmdBuffer);
+
+    vkCmdEndRenderPass(cmdBuffer);
+
+    VK_CHECK_RESULT(vkEndCommandBuffer(cmdBuffer));
+  }
 
   void render() override {
-    // if (!prepared_) {
-    //   return;
-    // }
-    // VulkanExampleBase::prepareFrame();
-    //  updateUniformBuffers();
-    // buildCommandBuffer();
-    // VulkanExampleBase::submitFrame();
+    if (!prepared_) {
+      return;
+    }
+    VulkanExampleBase::prepareFrame();
+    updateUniformBuffers();
+    buildCommandBuffer();
+    VulkanExampleBase::submitFrame();
   }
 
   virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay) {}
@@ -114,11 +155,11 @@ class VulkanExample : public VulkanExampleBase {
   void loadAssets() {
     textures_.skyBox.loadFromFile(
         getAssetPath() + "textures/cartoon_sky_cubemap.ktx",
-        VK_FORMAT_R8G8B8A8_UNORM, vulkanDevice_, queue_);
+        VK_FORMAT_R8G8B8A8_SRGB, vulkanDevice_, queue_);
 
     // Height data is stored in a one-channel texture
     textures_.heightMap.loadFromFile(
-        getAssetPath() + "textures/iceland_heightmap.ktx", VK_FORMAT_R16_UNORM,
+        getAssetPath() + "textures/iceland_heightmap.ktx", VK_FORMAT_R8_SRGB,
         vulkanDevice_, queue_);
 
     VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
