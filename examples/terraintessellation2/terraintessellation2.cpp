@@ -20,12 +20,38 @@ class VulkanExample : public VulkanExampleBase {
     vks::Texture2D heightMap{};
   } textures_;
 
+  struct TerrainUBO {
+    glm::mat4 mvp;
+  } terrainUbo;
+
+  struct UniformBuffers {
+    vks::Buffer terrain;
+  };
+  std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_;
+
   // Holds the buffers for rendering the tessellated terrain
   struct {
     vks::Buffer vertexBuffer;
     vks::Buffer indexBuffer;
     uint32_t indexCount{};
-  } terrain;
+  } terrain_;
+
+  struct Pipelines {
+    VkPipeline terrain{VK_NULL_HANDLE};
+  } pipelines_;
+
+  struct {
+    VkDescriptorSetLayout terrain{VK_NULL_HANDLE};
+  } descriptorSetLayouts_;
+
+  struct {
+    VkPipelineLayout terrain{VK_NULL_HANDLE};
+  } pipelineLayouts_;
+
+  struct DescriptorSets {
+    VkDescriptorSet terrain{VK_NULL_HANDLE};
+  };
+  std::array<DescriptorSets, MAX_CONCURRENT_FRAMES> descriptorSets_;
 
   VulkanExample() : VulkanExampleBase() {
     title = "Dynamic terrain tessellation";
@@ -55,12 +81,12 @@ class VulkanExample : public VulkanExampleBase {
     float height_shift = 16.f;
     // Generate vertices
     std::vector<vkglTF::Vertex> vertices(ROWS * COLS);
-    i = 0;
+    int i = 0;
     for (int r = 0; r < ROWS; r++) {
       for (int c = 0; c < COLS; c++) {
         // Read height map for 'y' value. Normalize to [0, 1] then rescale and
         // translate (up or down).
-        float height = ktxImage[i++] * height_scale - height_shift;
+        float height = ktxImage[i] * height_scale - height_shift;
 
         vertices[i].pos[0] = c - COLS / 2.f;
         vertices[i].pos[1] = height;
@@ -80,14 +106,182 @@ class VulkanExample : public VulkanExampleBase {
         }
       }
     }
+
+    // Allocate buffer space for vertices and indices
+    uint32_t vertexBufferSize = vertices.size() * sizeof(vkglTF::Vertex);
+    uint32_t indexBufferSize = indices.size() * sizeof(int);
+    vks::Buffer vertexBuffer, indexBuffer;
+
+    // Source
+    VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &vertexBuffer, vertexBufferSize, vertices.data()));
+    VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &indexBuffer, indexBufferSize, indices.data()));
+
+    // Destination
+    VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &terrain_.vertexBuffer,
+        vertexBufferSize));
+    VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &terrain_.indexBuffer,
+        indexBufferSize));
+
+    // Copy from staging buffers
+    VkCommandBuffer copyCmd = vulkanDevice_->createCommandBuffer(
+        VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+
+    VkBufferCopy copyRegion = {};
+
+    copyRegion.size = vertexBufferSize;
+    vkCmdCopyBuffer(copyCmd, vertexBuffer.buffer, terrain_.vertexBuffer.buffer,
+                    1, &copyRegion);
+
+    copyRegion.size = indexBufferSize;
+    vkCmdCopyBuffer(copyCmd, indexBuffer.buffer, terrain_.indexBuffer.buffer, 1,
+                    &copyRegion);
+
+    vulkanDevice_->flushCommandBuffer(copyCmd, queue_, true);
+
+    vkDestroyBuffer(device_, vertexBuffer.buffer, nullptr);
+    vkFreeMemory(device_, vertexBuffer.memory, nullptr);
+    vkDestroyBuffer(device_, indexBuffer.buffer, nullptr);
+    vkFreeMemory(device_, indexBuffer.memory, nullptr);
   }
 
-  void setupDescriptors() {}
+  void setupDescriptors() {
+    // Pool
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+        vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                              MAX_CONCURRENT_FRAMES * 1),
+        vks::initializers::descriptorPoolSize(
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            MAX_CONCURRENT_FRAMES * 1)};
+    VkDescriptorPoolCreateInfo descriptorPoolInfo =
+        vks::initializers::descriptorPoolCreateInfo(poolSizes,
+                                                    MAX_CONCURRENT_FRAMES * 1);
+    VK_CHECK_RESULT(vkCreateDescriptorPool(device_, &descriptorPoolInfo,
+                                           nullptr, &descriptorPool_));
 
-  void preparePipelines() {}
+    // Layouts
+    VkDescriptorSetLayoutCreateInfo descriptorLayout;
+    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
+
+    // Terrain
+    setLayoutBindings = {
+        // Binding 0 : Vertex shader ubo
+        vks::initializers::descriptorSetLayoutBinding(
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+    };
+    descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(
+        setLayoutBindings.data(),
+        static_cast<uint32_t>(setLayoutBindings.size()));
+    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
+        device_, &descriptorLayout, nullptr, &descriptorSetLayouts_.terrain));
+
+    for (auto i = 0; i < uniformBuffers_.size(); i++) {
+      // Terrain
+      VkDescriptorSetAllocateInfo allocInfo =
+          vks::initializers::descriptorSetAllocateInfo(
+              descriptorPool_, &descriptorSetLayouts_.terrain, 1);
+      VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
+                                               &descriptorSets_[i].terrain));
+      std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+          // Binding 0 : model, view, projection mat4
+          vks::initializers::writeDescriptorSet(
+              descriptorSets_[i].terrain, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
+              &uniformBuffers_[i].terrain.descriptor),
+      };
+      vkUpdateDescriptorSets(device_,
+                             static_cast<uint32_t>(writeDescriptorSets.size()),
+                             writeDescriptorSets.data(), 0, nullptr);
+    }
+  }
+
+  void preparePipelines() {
+    // Layouts
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
+
+    pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.terrain, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCreateInfo,
+                                           nullptr, &pipelineLayouts_.terrain));
+
+    // Pipelines
+    VkPipelineRasterizationStateCreateInfo rasterizationState =
+        vks::initializers::pipelineRasterizationStateCreateInfo(
+            VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
+            VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+    VkPipelineColorBlendAttachmentState blendAttachmentState =
+        vks::initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+    VkPipelineColorBlendStateCreateInfo colorBlendState =
+        vks::initializers::pipelineColorBlendStateCreateInfo(
+            1, &blendAttachmentState);
+    VkPipelineDepthStencilStateCreateInfo depthStencilState =
+        vks::initializers::pipelineDepthStencilStateCreateInfo(
+            VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+    VkPipelineViewportStateCreateInfo viewportState =
+        vks::initializers::pipelineViewportStateCreateInfo(1, 1, 0);
+    VkPipelineMultisampleStateCreateInfo multisampleState =
+        vks::initializers::pipelineMultisampleStateCreateInfo(
+            VK_SAMPLE_COUNT_1_BIT, 0);
+    std::vector<VkDynamicState> dynamicStateEnables = {
+        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_LINE_WIDTH};
+    VkPipelineDynamicStateCreateInfo dynamicState =
+        vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
+    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
+        vks::initializers::pipelineInputAssemblyStateCreateInfo(
+            VK_PRIMITIVE_TOPOLOGY_PATCH_LIST, 0, VK_FALSE);
+
+    // Terrain tessellation pipeline
+    shaderStages[0] =
+        loadShader(getShadersPath() + "terraintessellation2/mesh.vert.spv",
+                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] =
+        loadShader(getShadersPath() + "terraintessellation2/mesh.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkGraphicsPipelineCreateInfo pipelineCI =
+        vks::initializers::pipelineCreateInfo(pipelineLayouts_.terrain,
+                                              renderPass_);
+    pipelineCI.pInputAssemblyState = &inputAssemblyState;
+    pipelineCI.pRasterizationState = &rasterizationState;
+    pipelineCI.pColorBlendState = &colorBlendState;
+    pipelineCI.pMultisampleState = &multisampleState;
+    pipelineCI.pViewportState = &viewportState;
+    pipelineCI.pDepthStencilState = &depthStencilState;
+    pipelineCI.pDynamicState = &dynamicState;
+    pipelineCI.stageCount = 2;
+    pipelineCI.pStages = shaderStages.data();
+    pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
+        {vkglTF::VertexComponent::Position, vkglTF::VertexComponent::Normal,
+         vkglTF::VertexComponent::UV});
+    VK_CHECK_RESULT(vkCreateGraphicsPipelines(
+        device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.terrain));
+  }
 
   // Prepare and initialize uniform buffer containing shader uniforms
-  void prepareUniformBuffers() {}
+  void prepareUniformBuffers() {
+    for (auto& buffer : uniformBuffers_) {
+      // Skysphere vertex shader uniform buffer
+      VK_CHECK_RESULT(
+          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                      &buffer.terrain, sizeof(TerrainUBO)));
+      VK_CHECK_RESULT(buffer.terrain.map());
+    }
+  }
 
   void updateUniformBuffers() {}
 
@@ -204,6 +398,9 @@ class VulkanExample : public VulkanExampleBase {
     if (device_) {
       textures_.heightMap.destroy();
       textures_.skyBox.destroy();
+      for (auto& buffer : uniformBuffers_) {
+        buffer.terrain.destroy();
+      }
     }
   }
 };
