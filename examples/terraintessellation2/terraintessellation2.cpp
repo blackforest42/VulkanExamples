@@ -216,23 +216,18 @@ class VulkanExample : public VulkanExampleBase {
     setLayoutBindings = {
         // Binding 0 : Vertex shader ubo
         vks::initializers::descriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT,
+            /*binding id*/ 0),
         // Binding 1 : Color map
         vks::initializers::descriptorSetLayoutBinding(
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VK_SHADER_STAGE_FRAGMENT_BIT, 1),
+            VK_SHADER_STAGE_FRAGMENT_BIT, /*binding id*/ 1),
     };
     descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(
         setLayoutBindings.data(),
         static_cast<uint32_t>(setLayoutBindings.size()));
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
         device_, &descriptorLayout, nullptr, &descriptorSetLayouts_.skyBox));
-
-    // Image descriptor for the cube map texture
-    VkDescriptorImageInfo textureDescriptor =
-        vks::initializers::descriptorImageInfo(textures_.cubeMap.sampler,
-                                               textures_.cubeMap.view,
-                                               textures_.cubeMap.imageLayout);
 
     for (auto i = 0; i < uniformBuffers_.size(); i++) {
       // Terrain
@@ -262,7 +257,8 @@ class VulkanExample : public VulkanExampleBase {
               &uniformBuffers_[i].skybox.descriptor),
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].skyBox,
-              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &textureDescriptor),
+              VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+              &textures_.cubeMap.descriptor),
       };
       vkUpdateDescriptorSets(device_,
                              static_cast<uint32_t>(writeDescriptorSets.size()),
@@ -348,7 +344,9 @@ class VulkanExample : public VulkanExampleBase {
     shaderStages[1] =
         loadShader(getShadersPath() + "terraintessellation2/skybox.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
+    depthStencilState.depthWriteEnable = VK_FALSE;
     rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
+    pipelineCI.layout = pipelineLayouts_.terrain;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skyBox));
   }
@@ -435,29 +433,25 @@ class VulkanExample : public VulkanExampleBase {
 
     // Terrain/wireframe
     {
-      //  vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-      //                    wireframe ? pipelines_.wireframe :
-      //                    pipelines_.terrain);
-      //  vkCmdBindDescriptorSets(
-      //      cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-      //      pipelineLayouts_.terrain, 0, 1,
-      //      &descriptorSets_[currentBuffer_].terrain, 0, nullptr);
-      //  vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &terrain_.vertexBuffer.buffer,
-      //                         offsets);
-      //  vkCmdBindIndexBuffer(cmdBuffer, terrain_.indexBuffer.buffer, 0,
-      //                       VK_INDEX_TYPE_UINT32);
-      //  vkCmdDrawIndexed(cmdBuffer, terrain_.indexCount, 1, 0, 0, 0);
+      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        wireframe ? pipelines_.wireframe : pipelines_.terrain);
+      vkCmdBindDescriptorSets(
+          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.terrain,
+          0, 1, &descriptorSets_[currentBuffer_].terrain, 0, nullptr);
+      vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &terrain_.vertexBuffer.buffer,
+                             offsets);
+      vkCmdBindIndexBuffer(cmdBuffer, terrain_.indexBuffer.buffer, 0,
+                           VK_INDEX_TYPE_UINT32);
+      vkCmdDrawIndexed(cmdBuffer, terrain_.indexCount, 1, 0, 0, 0);
     }
 
     // Skybox
-    {
-      vkCmdBindDescriptorSets(
-          cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.terrain,
-          0, 1, &descriptorSets_[currentBuffer_].skyBox, 0, nullptr);
-      vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        pipelines_.skyBox);
-      models_.skyBox.draw(cmdBuffer);
-    }
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.terrain, 0,
+        1, &descriptorSets_[currentBuffer_].skyBox, 0, nullptr);
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipelines_.skyBox);
+    models_.skyBox.draw(cmdBuffer);
 
     // drawUI(cmdBuffer);
 
@@ -492,7 +486,7 @@ class VulkanExample : public VulkanExampleBase {
           "Selected GPU does not support tessellation shaders!",
           VK_ERROR_FEATURE_NOT_PRESENT);
     }
-    // Fill mode non solid is required for wireframe display
+    //  Fill mode non solid is required for wireframe display
     if (deviceFeatures_.fillModeNonSolid) {
       enabledFeatures_.fillModeNonSolid = VK_TRUE;
     };
