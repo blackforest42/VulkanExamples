@@ -59,7 +59,7 @@ class VulkanExample : public VulkanExampleBase {
     camera_.setPerspective(60.0f, (float)width_ / (float)height_, 0.1f, 512.0f);
     camera_.setRotation(glm::vec3(-12.0f, 159.0f, 0.0f));
     camera_.setTranslation(glm::vec3(18.0f, 22.5f, 57.5f));
-    camera_.movementSpeed = 10.0f;
+    camera_.movementSpeed = 100.0f;
   }
 
   // Generate a terrain quad patch with normals based on heightmap data
@@ -276,6 +276,9 @@ class VulkanExample : public VulkanExampleBase {
 
     pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
         {vkglTF::VertexComponent::Position});
+
+    // Render only the wireframe
+    // rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.terrain));
   }
@@ -294,9 +297,8 @@ class VulkanExample : public VulkanExampleBase {
   }
 
   void updateUniformBuffers() {
-    // Vertex shader
     terrain_ubo.mvp = camera_.matrices_.perspective *
-                      glm::mat4(glm::mat3(camera_.matrices_.view));
+                      glm::mat4(camera_.matrices_.view * glm::mat4(1.0f));
     memcpy(uniformBuffers_[currentBuffer_].terrain.mapped, &terrain_ubo,
            sizeof(TerrainUBO));
   }
