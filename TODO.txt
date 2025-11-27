@@ -1,7 +1,8 @@
 Nov 26
 TODO: 
+	- fix depth stencil bug for sky box
+	- fix un-gamma corrected skybox
 	- continue tesselation part 2
-	- skybox bugged, gl_Position vertices gets zeroed out after vertex shader stage
 
 DONE:
 	- Height map mesh generation + rendering done

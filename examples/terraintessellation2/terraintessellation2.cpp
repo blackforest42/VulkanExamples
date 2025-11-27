@@ -65,6 +65,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct {
     VkPipelineLayout terrain{VK_NULL_HANDLE};
+    VkPipelineLayout skyBox{VK_NULL_HANDLE};
   } pipelineLayouts_;
 
   struct DescriptorSets {
@@ -267,10 +268,16 @@ class VulkanExample : public VulkanExampleBase {
     // Layouts
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
 
+    // Terrain
     pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(
         &descriptorSetLayouts_.terrain, 1);
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCreateInfo,
                                            nullptr, &pipelineLayouts_.terrain));
+    // Skybox
+    pipelineLayoutCreateInfo = vks::initializers::pipelineLayoutCreateInfo(
+        &descriptorSetLayouts_.skyBox, 1);
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipelineLayoutCreateInfo,
+                                           nullptr, &pipelineLayouts_.skyBox));
 
     // Pipeline
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
@@ -324,7 +331,7 @@ class VulkanExample : public VulkanExampleBase {
         &swapChain_.colorFormat_;
     pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat_;
     pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat_;
-    // Chain into the pipeline creat einfo
+    // Chain into the pipeline create info
     pipelineCI.pNext = &pipelineRenderingCreateInfo;
 
     // Terrain tessellation pipeline
@@ -354,8 +361,10 @@ class VulkanExample : public VulkanExampleBase {
         loadShader(getShadersPath() + "terraintessellation2/skybox.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
     depthStencilState.depthWriteEnable = VK_FALSE;
+    depthStencilState.depthTestEnable = VK_TRUE;
     rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-    pipelineCI.layout = pipelineLayouts_.terrain;
+    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+    pipelineCI.layout = pipelineLayouts_.skyBox;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skyBox));
   }
@@ -490,9 +499,13 @@ class VulkanExample : public VulkanExampleBase {
     VkRect2D scissor = vks::initializers::rect2D(width_, height_, 0, 0);
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
-    vkCmdSetLineWidth(cmdBuffer, 1.0f);
-
-    VkDeviceSize offsets[1] = {0};
+    // Skybox
+    vkCmdBindDescriptorSets(
+        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.skyBox, 0,
+        1, &descriptorSets_[currentBuffer_].skyBox, 0, nullptr);
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipelines_.skyBox);
+    models_.skyBox.draw(cmdBuffer);
 
     // Terrain/wireframe
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -500,21 +513,14 @@ class VulkanExample : public VulkanExampleBase {
     vkCmdBindDescriptorSets(
         cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.terrain, 0,
         1, &descriptorSets_[currentBuffer_].terrain, 0, nullptr);
+    VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, &terrain_.vertexBuffer.buffer,
                            offsets);
     vkCmdBindIndexBuffer(cmdBuffer, terrain_.indexBuffer.buffer, 0,
                          VK_INDEX_TYPE_UINT32);
     vkCmdDrawIndexed(cmdBuffer, terrain_.indexCount, 1, 0, 0, 0);
 
-    // Skybox
-    vkCmdBindDescriptorSets(
-        cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.terrain, 0,
-        1, &descriptorSets_[currentBuffer_].skyBox, 0, nullptr);
-    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipelines_.skyBox);
-    models_.skyBox.draw(cmdBuffer);
-
-    // drawUI(cmdBuffer);
+    drawUI(cmdBuffer);
 
     // End dynamic rendering
     vkCmdEndRenderingKHR(cmdBuffer);
