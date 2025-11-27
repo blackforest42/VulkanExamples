@@ -18,16 +18,24 @@ class VulkanExample : public VulkanExampleBase {
   bool wireframe = false;
 
   struct {
+    vkglTF::Model skyBox;
+  } models_;
+
+  struct {
     vks::TextureCubeMap skyBox{};
     vks::Texture2D heightMap{};
   } textures_;
 
-  struct TerrainUBO {
+  struct ModelViewProjectionUBO {
     glm::mat4 mvp;
-  } terrain_ubo;
+  };
+  struct {
+    ModelViewProjectionUBO terrain, skybox;
+  } ubos_;
 
   struct UniformBuffers {
     vks::Buffer terrain;
+    vks::Buffer skybox;
   };
   std::array<UniformBuffers, MAX_CONCURRENT_FRAMES> uniformBuffers_;
 
@@ -295,21 +303,34 @@ class VulkanExample : public VulkanExampleBase {
   // Prepare and initialize uniform buffer containing shader uniforms
   void prepareUniformBuffers() {
     for (auto& buffer : uniformBuffers_) {
-      // Skysphere vertex shader uniform buffer
-      VK_CHECK_RESULT(
-          vulkanDevice_->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                      &buffer.terrain, sizeof(TerrainUBO)));
+      // Terrain vertex shader uniform buffer
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.terrain, sizeof(ModelViewProjectionUBO)));
       VK_CHECK_RESULT(buffer.terrain.map());
+
+      // Skybox vertex shader uniform buffer
+      VK_CHECK_RESULT(vulkanDevice_->createBuffer(
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+          &buffer.skybox, sizeof(ModelViewProjectionUBO)));
+      VK_CHECK_RESULT(buffer.skybox.map());
     }
   }
 
   void updateUniformBuffers() {
-    terrain_ubo.mvp = camera_.matrices_.perspective *
-                      glm::mat4(camera_.matrices_.view * glm::mat4(1.0f));
-    memcpy(uniformBuffers_[currentBuffer_].terrain.mapped, &terrain_ubo,
-           sizeof(TerrainUBO));
+    ubos_.terrain.mvp = camera_.matrices_.perspective *
+                        glm::mat4(camera_.matrices_.view * glm::mat4(1.0f));
+    memcpy(uniformBuffers_[currentBuffer_].terrain.mapped, &ubos_.terrain,
+           sizeof(ModelViewProjectionUBO));
+
+    ubos_.skybox.mvp = camera_.matrices_.perspective *
+                       glm::mat4(camera_.matrices_.view * glm::mat4(1.0f));
+    memcpy(uniformBuffers_[currentBuffer_].skybox.mapped, &ubos_.skybox,
+           sizeof(ModelViewProjectionUBO));
   }
 
   void prepare() {
