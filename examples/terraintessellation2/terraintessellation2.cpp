@@ -88,9 +88,9 @@ class VulkanExample : public VulkanExampleBase {
         // translate (up or down).
         float height = ktxImage[i] * height_scale - height_shift;
 
-        vertices[i].pos[0] = c - COLS / 2.f;
+        vertices[i].pos[0] = c * COLS / (float)COLS - COLS / 2.f;
         vertices[i].pos[1] = height;
-        vertices[i].pos[2] = r - ROWS / 2.f;
+        vertices[i].pos[2] = r * ROWS / (float)ROWS - ROWS / 2.f;
 
         i++;
       }
@@ -100,10 +100,21 @@ class VulkanExample : public VulkanExampleBase {
     // Generate indices
     std::vector<int> indices;
     for (int r = 0; r < ROWS - 1; r++) {
-      for (int c = 0; c < COLS; c++) {
-        for (int k = 0; k < 2; k++) {
-          indices.push_back(c + COLS * (r + k));
-        }
+      for (int c = 0; c < COLS - 1; c++) {
+        float top_left = r * COLS + c;
+        float top_right = top_left + 1;
+        float bottom_left = (r + 1) * COLS + c;
+        float bottom_right = bottom_left + 1;
+
+        // first tri
+        indices.push_back(top_left);
+        indices.push_back(bottom_left);
+        indices.push_back(top_right);
+
+        // second tri
+        indices.push_back(top_right);
+        indices.push_back(bottom_left);
+        indices.push_back(bottom_right);
       }
     }
     terrain_.indexCount = indices.size();
