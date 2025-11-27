@@ -15,6 +15,8 @@
 
 class VulkanExample : public VulkanExampleBase {
  public:
+  bool wireframe = false;
+
   struct {
     vks::TextureCubeMap skyBox{};
     vks::Texture2D heightMap{};
@@ -38,6 +40,7 @@ class VulkanExample : public VulkanExampleBase {
 
   struct Pipelines {
     VkPipeline terrain{VK_NULL_HANDLE};
+    VkPipeline wireframe{VK_NULL_HANDLE};
   } pipelines_;
 
   struct {
@@ -277,10 +280,16 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
         {vkglTF::VertexComponent::Position});
 
-    // Render only the wireframe
-    // rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.terrain));
+
+    // Wireframe
+    if (deviceFeatures_.fillModeNonSolid) {
+      rasterizationState.polygonMode = VK_POLYGON_MODE_LINE;
+      VK_CHECK_RESULT(vkCreateGraphicsPipelines(device_, pipelineCache_, 1,
+                                                &pipelineCI, nullptr,
+                                                &pipelines_.wireframe));
+    }
   }
 
   // Prepare and initialize uniform buffer containing shader uniforms
@@ -351,7 +360,7 @@ class VulkanExample : public VulkanExampleBase {
     VkDeviceSize offsets[1] = {0};
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pipelines_.terrain);
+                      wireframe ? pipelines_.wireframe : pipelines_.terrain);
     vkCmdBindDescriptorSets(
         cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts_.terrain, 0,
         1, &descriptorSets_[currentBuffer_].terrain, 0, nullptr);
@@ -378,10 +387,14 @@ class VulkanExample : public VulkanExampleBase {
     VulkanExampleBase::submitFrame();
   }
 
-  virtual void OnUpdateUIOverlay(vks::UIOverlay* overlay) {}
+  void OnUpdateUIOverlay(vks::UIOverlay* overlay) override {
+    if (deviceFeatures_.fillModeNonSolid) {
+      overlay->checkBox("Wireframe", &wireframe);
+    }
+  }
 
   // Enable physical device features required for this example
-  virtual void getEnabledFeatures() {
+  void getEnabledFeatures() override {
     // Tessellation shader support is required for this example
     if (deviceFeatures_.tessellationShader) {
       enabledFeatures_.tessellationShader = VK_TRUE;
@@ -427,6 +440,10 @@ class VulkanExample : public VulkanExampleBase {
 
   ~VulkanExample() {
     if (device_) {
+      vkDestroyPipeline(device_, pipelines_.terrain, nullptr);
+      if (pipelines_.wireframe != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device_, pipelines_.wireframe, nullptr);
+      }
       textures_.heightMap.destroy();
       textures_.skyBox.destroy();
       for (auto& buffer : uniformBuffers_) {
