@@ -136,7 +136,7 @@ class VulkanExample : public VulkanExampleBase {
     uint32_t indexBufferSize = indices.size() * sizeof(uint32_t);
     vks::Buffer vertexBuffer, indexBuffer;
 
-    // Source
+    // Staging Buffer (Source)
     VK_CHECK_RESULT(vulkanDevice_->createBuffer(
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -148,7 +148,7 @@ class VulkanExample : public VulkanExampleBase {
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &indexBuffer, indexBufferSize, indices.data()));
 
-    // Destination
+    // GPU Device Buffer (Destination)
     VK_CHECK_RESULT(vulkanDevice_->createBuffer(
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &terrain_.vertexBuffer,
@@ -563,7 +563,7 @@ class VulkanExample : public VulkanExampleBase {
   void loadAssets() {
     // Height data is stored in a one-channel texture
     textures_.heightMap.loadFromFile(
-        getAssetPath() + "textures/iceland_heightmap.ktx", VK_FORMAT_R8_SRGB,
+        getAssetPath() + "textures/iceland_heightmap.ktx", VK_FORMAT_R8_UINT,
         vulkanDevice_, queue_);
 
     VkSamplerCreateInfo samplerInfo = vks::initializers::samplerCreateInfo();
@@ -579,22 +579,6 @@ class VulkanExample : public VulkanExampleBase {
     textures_.cubeMap.loadFromFile(
         getAssetPath() + "textures/cartoon_sky_cubemap.ktx",
         VK_FORMAT_R8G8B8A8_SRGB, vulkanDevice_, queue_);
-
-    // Setup a mirroring sampler for the height map
-    vkDestroySampler(device_, textures_.heightMap.sampler, nullptr);
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-    samplerInfo.addressModeV = samplerInfo.addressModeU;
-    samplerInfo.addressModeW = samplerInfo.addressModeU;
-    samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = (float)textures_.heightMap.mipLevels;
-    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-    VK_CHECK_RESULT(vkCreateSampler(device_, &samplerInfo, nullptr,
-                                    &textures_.heightMap.sampler));
-    textures_.heightMap.descriptor.sampler = textures_.heightMap.sampler;
   }
 
   VulkanExample() : VulkanExampleBase() {

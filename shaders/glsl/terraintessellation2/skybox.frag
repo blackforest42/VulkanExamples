@@ -10,5 +10,8 @@ layout (binding = 1) uniform samplerCube samplerCubeMap;
 
 void main() 
 {
-	outFragColor = texture(samplerCubeMap, inUVW);
+	// gamma correct
+	vec3 fragColor = texture(samplerCubeMap, inUVW).xyz;
+	fragColor = pow(fragColor, vec3(1.0 / 2.2f));
+	outFragColor.rgb = fragColor;
 }

@@ -6,7 +6,7 @@ glslc -g skybox.frag -o skybox.frag.spv
 
 
 # Use `toktx` to create a .ktx cubemap from 6 .png files
-toktx --target_type RGBA --cubemap  cubemap.ktx  .\left.png .\right.png .\top.png .\bottom.png .\back.png .\front.png 
+toktx --assign_oetf srgb --target_type RGBA --cubemap  cartoon_sky_cubemap.ktx  .\px.png .\nx.png .\py.png .\ny.png .\pz.png .\nz.png 
 
 toktx --target_type R  --assign_oetf linear iceland_heightmap.ktx .\iceland_heightmap.png
 

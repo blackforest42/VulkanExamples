@@ -1,10 +1,10 @@
 Nov 26
 TODO: 
-	- fix depth stencil bug for sky box
-	- fix un-gamma corrected skybox
 	- continue tesselation part 2
 
 DONE:
 	- Height map mesh generation + rendering done
 	- wireframe view toggle
+	- fixed depth stencil bug for sky box
+	- fixed un-gamma corrected skybox
 
