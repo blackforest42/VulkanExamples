@@ -93,9 +93,9 @@ class VulkanExample : public VulkanExampleBase {
     float height_shift = 16.f;
     // Generate vertices
     std::vector<vkglTF::Vertex> vertices(ROWS * COLS);
-    int i = 0;
-    for (int r = 0; r < ROWS; r++) {
-      for (int c = 0; c < COLS; c++) {
+    uint32_t i = 0;
+    for (uint32_t r = 0; r < ROWS; r++) {
+      for (uint32_t c = 0; c < COLS; c++) {
         // Read height map for 'y' value. Normalize to [0, 1] then rescale and
         // translate (up or down).
         float height = ktxImage[i] * height_scale - height_shift;
@@ -110,13 +110,13 @@ class VulkanExample : public VulkanExampleBase {
     ktxTexture_Destroy(ktxTexture);
 
     // Generate indices
-    std::vector<int> indices;
-    for (int r = 0; r < ROWS - 1; r++) {
-      for (int c = 0; c < COLS - 1; c++) {
-        float top_left = r * COLS + c;
-        float top_right = top_left + 1;
-        float bottom_left = (r + 1) * COLS + c;
-        float bottom_right = bottom_left + 1;
+    std::vector<uint32_t> indices;
+    for (uint32_t r = 0; r < ROWS - 1; r++) {
+      for (uint32_t c = 0; c < COLS - 1; c++) {
+        uint32_t top_left = r * COLS + c;
+        uint32_t top_right = top_left + 1;
+        uint32_t bottom_left = (r + 1) * COLS + c;
+        uint32_t bottom_right = bottom_left + 1;
 
         // first tri
         indices.push_back(top_left);
@@ -129,11 +129,11 @@ class VulkanExample : public VulkanExampleBase {
         indices.push_back(bottom_right);
       }
     }
-    terrain_.indexCount = indices.size();
+    terrain_.indexCount = (uint32_t)indices.size();
 
     // Allocate buffer space for vertices and indices
-    uint32_t vertexBufferSize = vertices.size() * sizeof(vkglTF::Vertex);
-    uint32_t indexBufferSize = indices.size() * sizeof(uint32_t);
+    size_t vertexBufferSize = vertices.size() * sizeof(vkglTF::Vertex);
+    size_t indexBufferSize = indices.size() * sizeof(uint32_t);
     vks::Buffer vertexBuffer, indexBuffer;
 
     // Staging Buffer (Source)
