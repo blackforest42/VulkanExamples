@@ -100,6 +100,7 @@ class VulkanExample : public VulkanExampleBase {
         // translate (up or down).
         float height = ktxImage[i] * height_scale - height_shift;
 
+        // xyz positions
         vertices[i].pos[0] = c * COLS / (float)COLS - COLS / 2.f;
         vertices[i].pos[1] = -height;
         vertices[i].pos[2] = r * ROWS / (float)ROWS - ROWS / 2.f;
@@ -200,9 +201,12 @@ class VulkanExample : public VulkanExampleBase {
 
     // Terrain
     setLayoutBindings = {
-        // Binding 0 : Vertex shader ubo
+        // Binding 0 : Shared Tessellation shader UBO
         vks::initializers::descriptorSetLayoutBinding(
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 0),
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT |
+                VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+            0),
     };
     descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(
         setLayoutBindings.data(),
@@ -235,7 +239,7 @@ class VulkanExample : public VulkanExampleBase {
       VK_CHECK_RESULT(vkAllocateDescriptorSets(device_, &allocInfo,
                                                &descriptorSets_[i].terrain));
       std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-          // Binding 0 : model, view, projection mat4
+          // Binding 0 : MVP (model x view x projection) mat4
           vks::initializers::writeDescriptorSet(
               descriptorSets_[i].terrain, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,
               &uniformBuffers_[i].terrain.descriptor),
@@ -280,9 +284,6 @@ class VulkanExample : public VulkanExampleBase {
                                            nullptr, &pipelineLayouts_.skyBox));
 
     // Pipeline
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
-        vks::initializers::pipelineInputAssemblyStateCreateInfo(
-            VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
     VkPipelineRasterizationStateCreateInfo rasterizationState =
         vks::initializers::pipelineRasterizationStateCreateInfo(
             VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT,
@@ -304,7 +305,28 @@ class VulkanExample : public VulkanExampleBase {
         VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamicState =
         vks::initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
+    std::array<VkPipelineShaderStageCreateInfo, 4> shaderStages;
+
+    // Tessellation stage input is a patch of quads
+    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
+        vks::initializers::pipelineInputAssemblyStateCreateInfo(
+            VK_PRIMITIVE_TOPOLOGY_PATCH_LIST, 0, VK_FALSE);
+    VkPipelineTessellationStateCreateInfo tessellationState =
+        vks::initializers::pipelineTessellationStateCreateInfo(4);
+
+    // Terrain tessellation pipeline stages
+    shaderStages[0] =
+        loadShader(getShadersPath() + "terraintessellation2/terrain.vert.spv",
+                   VK_SHADER_STAGE_VERTEX_BIT);
+    shaderStages[1] =
+        loadShader(getShadersPath() + "terraintessellation2/terrain.frag.spv",
+                   VK_SHADER_STAGE_FRAGMENT_BIT);
+    shaderStages[2] =
+        loadShader(getShadersPath() + "terraintessellation2/terrain.tesc.spv",
+                   VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+    shaderStages[3] =
+        loadShader(getShadersPath() + "terraintessellation2/terrain.tese.spv",
+                   VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
     VkGraphicsPipelineCreateInfo pipelineCI =
         vks::initializers::pipelineCreateInfo();
@@ -316,13 +338,14 @@ class VulkanExample : public VulkanExampleBase {
     pipelineCI.pViewportState = &viewportState;
     pipelineCI.pDepthStencilState = &depthStencilState;
     pipelineCI.pDynamicState = &dynamicState;
+    pipelineCI.pTessellationState = &tessellationState;
     pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
     pipelineCI.pStages = shaderStages.data();
     pipelineCI.pVertexInputState = vkglTF::Vertex::getPipelineVertexInputState(
         {vkglTF::VertexComponent::Position});
 
-    // New create info to define color, depth and stencil attachments at
-    // pipeline create time
+    // Dynamic rendering. New create info to define color, depth and stencil
+    // attachments at pipeline create time
     VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo{};
     pipelineRenderingCreateInfo.sType =
         VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
@@ -333,14 +356,6 @@ class VulkanExample : public VulkanExampleBase {
     pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat_;
     // Chain into the pipeline create info
     pipelineCI.pNext = &pipelineRenderingCreateInfo;
-
-    // Terrain tessellation pipeline
-    shaderStages[0] =
-        loadShader(getShadersPath() + "terraintessellation2/mesh.vert.spv",
-                   VK_SHADER_STAGE_VERTEX_BIT);
-    shaderStages[1] =
-        loadShader(getShadersPath() + "terraintessellation2/mesh.frag.spv",
-                   VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.terrain));
@@ -353,18 +368,23 @@ class VulkanExample : public VulkanExampleBase {
                                                 &pipelines_.wireframe));
     }
 
-    // Skybox (cubemap)
+    // Skybox (cubemap) pipeline
+    depthStencilState.depthWriteEnable = VK_FALSE;
+    depthStencilState.depthTestEnable = VK_TRUE;
+    rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
+    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
+    // Revert to triangle list topology
+    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    // Reset tessellation state
+    pipelineCI.pTessellationState = nullptr;
+    pipelineCI.layout = pipelineLayouts_.skyBox;
+    pipelineCI.stageCount = 2;
     shaderStages[0] =
         loadShader(getShadersPath() + "terraintessellation2/skybox.vert.spv",
                    VK_SHADER_STAGE_VERTEX_BIT);
     shaderStages[1] =
         loadShader(getShadersPath() + "terraintessellation2/skybox.frag.spv",
                    VK_SHADER_STAGE_FRAGMENT_BIT);
-    depthStencilState.depthWriteEnable = VK_FALSE;
-    depthStencilState.depthTestEnable = VK_TRUE;
-    rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-    pipelineCI.layout = pipelineLayouts_.skyBox;
     VK_CHECK_RESULT(vkCreateGraphicsPipelines(
         device_, pipelineCache_, 1, &pipelineCI, nullptr, &pipelines_.skyBox));
   }
